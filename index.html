@@ -469,6 +469,8 @@ button,a,.tab,.qa-chip,.stat-card,.chip,.row{-webkit-tap-highlight-color:transpa
     <div class="tab" id="t-contacts" onclick="go('contacts')"><div class="tab-i">👤</div><div class="tab-t">Contacts</div></div>
     <div class="tab" id="t-search" onclick="go('search')"><div class="tab-i">🔍</div><div class="tab-t">Search</div></div>
     <div class="tab" id="t-log" onclick="go('log')"><div class="tab-i">📋</div><div class="tab-t">Call Log</div></div>
+    <div class="tab" id="t-buyers" onclick="go('buyers')"><div class="tab-i">🔍</div><div class="tab-t">Buyers</div></div>
+    <div class="tab" id="t-listings" onclick="go('listings')"><div class="tab-i">🏠</div><div class="tab-t">Listings</div></div>
     <div class="tab" id="t-appt" onclick="go('appt')"><div class="tab-i">📅</div><div class="tab-t">Appts</div><div class="dot" id="bd-appt" style="display:none"></div></div>
     <div class="tab" id="t-todo" onclick="go('todo')"><div class="tab-i">✅</div><div class="tab-t">To Do</div><div class="dot" id="bd-todo" style="display:none"></div></div>
   </div>
@@ -873,7 +875,7 @@ function rTB(){
   var p=S.pg;
   var th='<button class="tb-btn btn-th" onclick="toggleTheme()">'+( S.theme==='light'?'🌙':'☀️')+'</button>';
   var tb=$('topbar');if(!tb)return;
-  var titles={smart:'Smart Calls',props:'Properties',contacts:'Contacts',appt:'Appointments',todo:'To Do',search:'Search',hot:'🔥 Hot List',log:'Call Log',bulk:'Bulk SMS',streets:'Streets'};
+  var titles={smart:'Smart Calls',props:'Properties',contacts:'Contacts',appt:'Appointments',todo:'To Do',search:'Search',hot:'🔥 Hot List',log:'Call Log',bulk:'Bulk SMS',streets:'Streets',buyers:'Buyers',listings:'My Listings'};
   if(p==='home'){
     tb.innerHTML='<div style="flex:1;min-width:0"><div class="tb-logo">Luxe Properties</div><div class="tb-sub">Melbourne · Prospecting</div></div><div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+th+'<button class="tb-btn btn-add" onclick="addMenu()">+</button></div>';
   } else if(['pdet','cdet'].includes(p)){
@@ -1274,7 +1276,7 @@ function saveSaleAlert(){
 function filt(){var pp=gP().filter(function(p){return!p.archived;});if(S.fstr)pp=pp.filter(function(p){return p.s===S.fstr;});if(S.fst)pp=pp.filter(function(p){return p.status===S.fst;});if(S.fq){var q=S.fq.toLowerCase();pp=pp.filter(function(p){return(p.a||'').toLowerCase().includes(q)||(p.n||'').toLowerCase().includes(q)||(p.p||'').includes(q)||(p.e||'').toLowerCase().includes(q);});}return pp;}
 
 function rProps(){
-  var ff=filt(),pg=ff.slice(0,S.pgSz),more=ff.length>S.pgSz;
+  var ff=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');});var pg=ff.slice(0,S.pgSz),more=ff.length>S.pgSz;
   var sts=[...new Set(gP().filter(function(p){return!p.archived;}).map(function(p){return p.s;}))].sort();
   $('scr').innerHTML=
   '<div class="sb"><div class="sb-in"><span class="sb-ic">⌕</span><input id="ps" type="text" placeholder="Search address, name, phone…" value="'+(S.fq||'').replace(/"/g,'&quot;')+'" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="none" inputmode="search">'+(S.fq?'<span class="sb-x" onclick="S.fq=\'\';rProps()">✕</span>':'')+'</div></div>'+
@@ -1291,7 +1293,22 @@ function rProps(){
   setTimeout(swipes,80);
 }
 function apF(k,v){if(k==='status')S.fst=v;else S.fstr=v;S.pgSz=40;rProps();}
-function moreP(){S.pgSz+=40;var l=$('pl');if(l)l.innerHTML=filt().slice(0,S.pgSz).map(pRow).join('');setTimeout(swipes,80);}
+function moreP(){S.pgSz+=40;var l=$('pl');if(l)l.innerHTML=filt().slice(0,S.pgSz).map(pRow).join('');setTimeout(function(){
+    swipes();
+    renderAZIndex('pl',function(letter){
+      var items=document.querySelectorAll('#pl .row,.sw');
+      var target=null;
+      items.forEach(function(el){
+        if(!target){
+          var rt=el.querySelector('.rt');
+          if(rt&&rt.textContent.toUpperCase().startsWith(letter))target=el;
+        }
+      });
+      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+      else toast('No properties starting with '+letter);
+    });
+  },80);
+}
 
 function pRow(p){
   var hl=gH().filter(function(h){return!h.archived;});var isH=p.isHot||hl.find(function(h){return h.a===p.a;});
@@ -1321,6 +1338,32 @@ function pRow(p){
 }
 
 /* ── PROPERTY DETAIL with TABS ── */
+
+function loadMoreProps(){
+  S.pgSz=(S.pgSz||50)+100;
+  var ff=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');});
+  var pg=ff.slice(0,S.pgSz);
+  var l=$('pl');if(!l)return;
+  var lm=document.getElementById('load-more-p');if(lm)lm.remove();
+  var existing=new Set();
+  l.querySelectorAll('.sw[id]').forEach(function(el){existing.add(parseInt(el.id.replace('swp','')));});
+  pg.forEach(function(p){
+    if(!existing.has(p.id)){
+      var div=document.createElement('div');
+      div.innerHTML=pRow(p);
+      l.appendChild(div.firstChild);
+    }
+  });
+  if(ff.length>S.pgSz){
+    var btn=document.createElement('div');
+    btn.id='load-more-p';btn.style.cssText='text-align:center;padding:16px;color:var(--muted);font-size:13px;cursor:pointer';
+    btn.textContent='Load more ('+(ff.length-S.pgSz)+' more) ›';
+    btn.onclick=loadMoreProps;
+    l.appendChild(btn);
+  }
+  setTimeout(swipes,50);
+}
+
 function rPDet(){
   var p=gP().find(function(x){return x.id===S.pid;});if(!p){go('props');return;}
   var hl=gH().filter(function(h){return!h.archived;});var isH=p.isHot||hl.find(function(h){return h.a===p.a;});
@@ -1584,9 +1627,9 @@ function rContacts(){
     '<span>'+ff.length+' contacts'+(q?' for "'+S.cfq+'"':'')+'</span>'+
     '<div style="display:flex;gap:12px"><button class="slnk" onclick="importContM()">⬆ Import</button><button class="slnk" onclick="exportCont()">⬇ Export</button><button class="slnk" onclick="addContM()">+ Add</button></div>'+
   '</div>'+
-  '<div id="cl">'+(ff.length===0?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div><div class="empty-s">'+(q?'Try a different search':'Add contacts or they appear from your properties database')+'</div></div>':ff.slice(0,80).map(cRow).join(''))+'</div>'+
+  '<div id="cl">'+(ff.length===0?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div><div class="empty-s">'+(q?'Try a different search':'Add contacts or they appear from your properties database')+'</div></div>':ff.slice(0,150).map(cRow).join('')+(ff.length>150?'<div id="load-more-c" style="text-align:center;padding:16px;color:var(--muted);font-size:13px" onclick="loadMoreContacts()">Load more ('+( ff.length-150)+' remaining) ›</div>':''))+'</div>'+
   '<div style="height:80px"></div>';
-  srchBind('cs',function(){var q2=(S.cfq||'').toLowerCase().trim();var all2=allC();var ff2=q2?all2.filter(function(c){return(c.name||'').toLowerCase().includes(q2)||(c.phone||'').replace(/\s/g,'').includes(q2.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q2)||(c.address||'').toLowerCase().includes(q2);}):all2;var l=$('cl');if(l)l.innerHTML=ff2.slice(0,80).map(cRow).join('');setTimeout(swipes,50);},function(v){S.cfq=v;});
+  srchBind('cs',function(){var q2=(S.cfq||'').toLowerCase().trim();var all2=allC();var ff2=q2?all2.filter(function(c){return(c.name||'').toLowerCase().includes(q2)||(c.phone||'').replace(/\s/g,'').includes(q2.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q2)||(c.address||'').toLowerCase().includes(q2);}):all2;var l=$('cl');if(l)l.innerHTML=ff2.slice(0,150).map(cRow).join('')+(ff2.length>150?'<div id="load-more-c" style="text-align:center;padding:16px;color:var(--muted);font-size:13px" onclick="loadMoreContacts()">Load more ('+( ff2.length-150)+' remaining) ›</div>':'');setTimeout(swipes,50);},function(v){S.cfq=v;});
   setTimeout(function(){
     swipes();
     renderAZIndex('cl',function(letter){
@@ -1601,6 +1644,32 @@ function rContacts(){
     });
   },80);
 }
+
+function loadMoreContacts(){
+  var q=(S.cfq||'').toLowerCase().trim();
+  var all=allC();
+  var ff=q?all.filter(function(c){return(c.name||'').toLowerCase().includes(q)||(c.phone||'').replace(/\s/g,'').includes(q.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q)||(c.address||'').toLowerCase().includes(q);}):all;
+  var l=$('cl');if(!l)return;
+  var shown=l.querySelectorAll('.sw').length;
+  var next=ff.slice(shown,shown+150);
+  var lm=document.getElementById('load-more-c');if(lm)lm.remove();
+  next.forEach(function(c){
+    var div=document.createElement('div');
+    div.innerHTML=cRow(c);
+    l.appendChild(div.firstChild);
+  });
+  var remaining=ff.length-(shown+next.length);
+  if(remaining>0){
+    var btn=document.createElement('div');
+    btn.id='load-more-c';
+    btn.style.cssText='text-align:center;padding:16px;color:var(--muted);font-size:13px;cursor:pointer';
+    btn.textContent='Load more ('+remaining+' remaining) ›';
+    btn.onclick=loadMoreContacts;
+    l.appendChild(btn);
+  }
+  setTimeout(swipes,50);
+}
+
 function clrC(){S.cfq='';rContacts();}
 
 function cRow(c){
@@ -2181,7 +2250,12 @@ function rLog(){
       var chk=sel.has(String(ix.id));
       var hasPhone=!!(ix.phone||(ix.propertyId&&gP().find(function(p){return p.id===ix.propertyId&&p.p;})));
       var ph=ix.phone||(ix.propertyId?((gP().find(function(p){return p.id===ix.propertyId;})||{}).p||''):'');
-      html+='<div class="log-row'+(chk?' selected':'')+'" id="lr'+ix.id+'">';
+      html+='<div class="sw" id="swl'+ix.id+'">';
+      html+='<div class="sw-acts">';
+      html+='<div class="sa sa-gr" style="touch-action:manipulation" onclick="archLogItem(\''+ix.id+'\')"><span>📦</span>Archive</div>';
+      html+='<div class="sa sa-rd" style="touch-action:manipulation" onclick="delLog(\''+ix.id+'\')"><span>🗑️</span>Delete</div>';
+      html+='</div>';
+      html+='<div class="row log-row'+(chk?' selected':'')+'" id="lr'+ix.id+'">';
       // TICK BOX
       html+='<div class="log-tick'+(chk?' on':'')+'" style="touch-action:manipulation" onclick="logToggle(\''+ix.id+'\')">'+(chk?'✓':'')+'</div>';
       // CONTENT (tap to open property)
@@ -2208,6 +2282,7 @@ function rLog(){
       html+='<button class="ibt" style="touch-action:manipulation" onclick="delLog(\''+ix.id+'\')">🗑️</button>';
       html+='</div>';
       html+='</div>';
+      html+='</div>';//end sw
     });
   }
   html+='<div style="height:80px"></div>';
