@@ -597,7 +597,209 @@ function sC(){localStorage.setItem('lc',JSON.stringify(gC()));}
 function gTodos(){if(!_todos)_todos=JSON.parse(localStorage.getItem('ltd')||'[]');return _todos;}
 function sTodos(){localStorage.setItem('ltd',JSON.stringify(gTodos()));}
 function gSA(){return JSON.parse(localStorage.getItem('sa')||'[]');}
-function sSA(a){localStorage.setItem('sa',JSON.stringify(a));}
+function sSA(a){localStorage.setItem('sa',JSON.stringify(a));sbQueue('sa');}
+
+/* ══════════════════════════════════════════════════════════
+   SUPABASE REAL-TIME SYNC ENGINE
+   ══════════════════════════════════════════════════════════ */
+
+var SB = {
+  url: '',        // set after user enters project URL
+  key: '',        // set after user enters anon key
+  connected: false,
+  syncing: false,
+  lastSync: null,
+  realtimeCh: null,
+  pendingKeys: new Set(),
+  debounceTimer: null
+};
+
+var SYNC_KEYS = ['lp','lpc','li','la','lh','lc','ltd','sa','sa_alts','lp_buyers','lp_listings'];
+
+// ── Load Supabase credentials from localStorage ──
+(function(){
+  SB.url = localStorage.getItem('sb_url') || '';
+  SB.key = localStorage.getItem('sb_key') || '';
+})();
+
+function sbReady(){ return !!(SB.url && SB.key); }
+
+// ── Push a single key to Supabase ──
+async function sbPush(key) {
+  if(!sbReady()) return;
+  var val = localStorage.getItem(key) || 'null';
+  try {
+    var res = await fetch(SB.url + '/rest/v1/lp_sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SB.key,
+        'Authorization': 'Bearer ' + SB.key,
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ user_id: 'alex_luxe', key: key, value: val, updated_at: new Date().toISOString() })
+    });
+    if(!res.ok) console.warn('sbPush failed:', key, res.status);
+  } catch(e) { console.warn('sbPush error:', key, e.message); }
+}
+
+// ── Debounced batch push (wait 800ms after last save then push all pending) ──
+function sbQueue(key) {
+  if(!sbReady()) return;
+  SB.pendingKeys.add(key);
+  clearTimeout(SB.debounceTimer);
+  SB.debounceTimer = setTimeout(async function(){
+    var keys = Array.from(SB.pendingKeys);
+    SB.pendingKeys.clear();
+    for(var i=0; i<keys.length; i++) await sbPush(keys[i]);
+    SB.lastSync = new Date();
+    sbUpdateUI();
+  }, 800);
+}
+
+// ── Pull ALL keys from Supabase on load ──
+async function sbPullAll() {
+  if(!sbReady()) return;
+  sbUpdateUI('syncing');
+  try {
+    var res = await fetch(SB.url + '/rest/v1/lp_sync?user_id=eq.alex_luxe&select=key,value,updated_at', {
+      headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key }
+    });
+    if(!res.ok){ sbUpdateUI('error'); return; }
+    var rows = await res.json();
+    var merged = 0;
+    rows.forEach(function(row){
+      var local = localStorage.getItem(row.key);
+      var remoteTs = new Date(row.updated_at).getTime();
+      // Use remote if newer or local doesn't exist
+      var localTs = parseInt(localStorage.getItem(row.key + '_ts') || '0');
+      if(!local || remoteTs > localTs) {
+        localStorage.setItem(row.key, row.value);
+        localStorage.setItem(row.key + '_ts', remoteTs);
+        merged++;
+      }
+    });
+    // Clear in-memory caches so data reloads from updated localStorage
+    _props=null; _ix=null; _appts=null; _hot=null; _contacts=null; _todos=null; _buyers=null; _listings=null;
+    SB.connected = true;
+    SB.lastSync = new Date();
+    if(merged > 0) {
+      toast('☁️ Synced ' + merged + ' records from cloud');
+      // Refresh current page
+      var fn = {home:rHome,smart:rSmart,props:rProps,contacts:rContacts,appt:rAppt,hot:rHot,log:rLog,bulk:rBulk,buyers:rBuyers,listings:rListings}[S.pg];
+      if(fn) fn();
+    }
+    sbUpdateUI('connected');
+    sbStartRealtime();
+  } catch(e) {
+    console.warn('sbPullAll error:', e.message);
+    sbUpdateUI('error');
+  }
+}
+
+// ── Realtime subscription: push from Supabase to this device when another device saves ──
+function sbStartRealtime() {
+  if(!sbReady() || SB.realtimeCh) return;
+  // Use Supabase realtime websocket
+  var wsUrl = SB.url.replace('https://', 'wss://').replace('http://', 'ws://') + '/realtime/v1/websocket?apikey=' + SB.key + '&vsn=1.0.0';
+  try {
+    var ws = new WebSocket(wsUrl);
+    SB.realtimeCh = ws;
+    ws.onopen = function(){
+      ws.send(JSON.stringify({topic:'realtime:public:lp_sync',event:'phx_join',payload:{config:{broadcast:{self:false},presence:{key:''}}},ref:'1'}));
+    };
+    ws.onmessage = function(e){
+      try {
+        var msg = JSON.parse(e.data);
+        if(msg.event === 'postgres_changes' && msg.payload && msg.payload.record) {
+          var rec = msg.payload.record;
+          if(rec.user_id === 'alex_luxe' && SYNC_KEYS.includes(rec.key)) {
+            localStorage.setItem(rec.key, rec.value);
+            localStorage.setItem(rec.key + '_ts', new Date(rec.updated_at).getTime());
+            // Invalidate cache for this key
+            var cacheMap = {lp:'_props',lpc:'_props',li:'_ix',la:'_appts',lh:'_hot',lc:'_contacts',ltd:'_todos',lp_buyers:'_buyers',lp_listings:'_listings'};
+            if(cacheMap[rec.key]) window[cacheMap[rec.key]] = null;
+            toast('☁️ Live update received');
+            var fn = {home:rHome,smart:rSmart,props:rProps,contacts:rContacts,appt:rAppt,hot:rHot,log:rLog,bulk:rBulk,buyers:rBuyers,listings:rListings}[S.pg];
+            if(fn) fn();
+          }
+        }
+      } catch(err){}
+    };
+    ws.onerror = function(){ SB.realtimeCh = null; };
+    ws.onclose = function(){ SB.realtimeCh = null; setTimeout(sbStartRealtime, 5000); };
+  } catch(e){ SB.realtimeCh = null; }
+}
+
+// ── Update sync status indicator in UI ──
+function sbUpdateUI(state) {
+  var el = document.getElementById('sb-status');
+  if(!el) return;
+  if(!sbReady()) { el.textContent = ''; return; }
+  if(state === 'syncing') { el.textContent = '☁️ Syncing…'; el.style.color = 'var(--muted)'; return; }
+  if(state === 'error')   { el.textContent = '☁️ Sync error'; el.style.color = '#EF4444'; return; }
+  if(state === 'connected' || SB.connected) {
+    var t = SB.lastSync ? SB.lastSync.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '';
+    el.textContent = '☁️ Synced ' + t;
+    el.style.color = 'var(--green)';
+  }
+}
+
+// ── Show Supabase setup modal ──
+function showSupabaseSetup() {
+  modal('<div class="sht"><div class="sht-h"></div>' +
+    '<div class="sht-hdr"><div><div class="sht-ttl">☁️ Supabase Sync Setup</div><div class="sht-sub">Connect for real-time cross-device sync</div></div><button class="sht-x" onclick="cls()">✕</button></div>' +
+    '<div class="sht-bd">' +
+      (sbReady()
+        ? '<div style="background:var(--gnbg);border:1.5px solid var(--green);border-radius:14px;padding:14px;margin-bottom:14px">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--green)">✅ Connected to Supabase</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:4px;word-break:break-all">' + SB.url + '</div>' +
+          '</div>'
+        : '<div style="background:var(--gdbg);border:1.5px solid var(--gold);border-radius:14px;padding:14px;margin-bottom:14px">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">⚡ Setup Required — 2 minutes</div>' +
+            '<div style="font-size:12px;color:var(--text);line-height:1.7">'+
+              '1. Go to <strong>supabase.com</strong> → New Project<br>' +
+              '2. Name: <strong>luxe-sync</strong> · Region: <strong>Southeast Asia</strong><br>' +
+              '3. SQL Editor → paste the setup SQL → Run<br>' +
+              '4. Settings → API → copy URL &amp; anon key<br>' +
+              '5. Paste both below' +
+            '</div>' +
+          '</div>'
+      ) +
+      '<div class="fg"><div class="fl">Supabase Project URL</div><input class="fi" id="sb_url_in" placeholder="https://xxxx.supabase.co" value="' + (SB.url||'') + '"></div>' +
+      '<div class="fg"><div class="fl">Supabase Anon Key</div><input class="fi" id="sb_key_in" placeholder="eyJhbGci..." value="' + (SB.key||'') + '" style="font-size:12px;font-family:monospace"></div>' +
+    '</div>' +
+    '<div class="sht-ft" style="gap:8px">' +
+      '<button class="btn btn-gh" onclick="cls()">Cancel</button>' +
+      '<button class="btn btn-gd" style="flex:2" onclick="saveSupabaseCreds()">Connect & Sync</button>' +
+    '</div>' +
+  '</div>');
+}
+
+function saveSupabaseCreds() {
+  var url = ($('sb_url_in').value || '').trim().replace(/\/$/, '');
+  var key = ($('sb_key_in').value || '').trim();
+  if(!url || !key) { toast('Enter both URL and key'); return; }
+  SB.url = url; SB.key = key; SB.connected = false; SB.realtimeCh = null;
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  cls();
+  toast('Connecting to Supabase…');
+  sbPullAll();
+}
+
+// ── Wire all save functions to also push to Supabase ──
+var _origSP = sP; sP = function(){ _origSP(); sbQueue('lp'); sbQueue('lpc'); };
+var _origSI = sI; sI = function(){ _origSI(); sbQueue('li'); };
+var _origSA = sA; sA = function(){ _origSA(); sbQueue('la'); };
+var _origSH = sH; sH = function(){ _origSH(); sbQueue('lh'); };
+var _origSC = sC; sC = function(){ _origSC(); sbQueue('lc'); };
+var _origST = sTodos; sTodos = function(){ _origST(); sbQueue('ltd'); };
+var _origSB = sB; sB = function(){ _origSB(); sbQueue('lp_buyers'); };
+var _origSLS = sLS; sLS = function(){ _origSLS(); sbQueue('lp_listings'); };
+
+/* ══════════════════════════════════════════════════════════ */
+
 
 /* ── HELPERS ── */
 const $=function(id){return document.getElementById(id);};
@@ -2182,7 +2384,8 @@ function showCloudSyncInfo(){
       '</div>' +
     '</div>' +
     '<div class="sht-ft">' +
-      '<button class="btn btn-gd btn-fw" onclick="cls();showSyncModal()">🔄 Export / Import Data</button>' +
+      '<button class="btn btn-gd btn-fw" onclick="cls();showSyncModal()">🔄 Export / Import Data</button>'+
+      '<button class="btn btn-teal btn-fw" style="margin-top:8px" onclick="cls();showSupabaseSetup()">☁️ '+(sbReady()?'Supabase Connected ✅':'Connect Supabase Auto-Sync')+'</button>' +
     '</div>' +
   '</div>');
 }
@@ -2943,6 +3146,19 @@ window.addEventListener('DOMContentLoaded',function(){
     });
     if(changed)sA();
   })();
+  // Supabase: pull latest data on load
+  if(sbReady()) {
+    setTimeout(sbPullAll, 500);
+  } else {
+    // Show setup prompt once if not connected
+    var sbPrompted = localStorage.getItem('sb_prompted');
+    if(!sbPrompted) {
+      setTimeout(function(){
+        localStorage.setItem('sb_prompted','1');
+        toast('☁️ Tap Cloud Sync to enable cross-device sync');
+      }, 2500);
+    }
+  }
   // Hide splash screen
   var sp=document.getElementById('splash');
   if(sp){setTimeout(function(){sp.style.opacity='0';sp.style.transition='opacity 0.4s';setTimeout(function(){sp.remove();},400);},300);}
