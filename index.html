@@ -1289,25 +1289,83 @@ function rProps(){
   '<div id="pl">'+(pg.length===0?'<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No results</div><div class="empty-s">Try a different search or clear filters</div></div>':pg.map(pRow).join(''))+'</div>'+
   (more?'<div style="padding:14px"><button class="btn btn-gh btn-fw" onclick="moreP()">Load more ('+( ff.length-S.pgSz)+' remaining)</button></div>':'')+
   '<div style="height:80px"></div>';
-  srchBind('ps',function(){var l=$('pl');if(l)l.innerHTML=filt().slice(0,S.pgSz).map(pRow).join('');setTimeout(swipes,50);},function(v){S.fq=v;S.pgSz=40;});
-  setTimeout(swipes,80);
-}
-function apF(k,v){if(k==='status')S.fst=v;else S.fstr=v;S.pgSz=40;rProps();}
-function moreP(){S.pgSz+=40;var l=$('pl');if(l)l.innerHTML=filt().slice(0,S.pgSz).map(pRow).join('');setTimeout(function(){
+  srchBind('ps',function(){
+    var q=S.fq.toLowerCase();
+    var res=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');}).slice(0,S.pgSz);
+    var l=$('pl');
+    if(l)l.innerHTML=res.length===0
+      ?'<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No results</div></div>'
+      :res.map(pRow).join('');
+    setTimeout(swipes,50);
+  },function(v){S.fq=v;S.pgSz=40;});
+
+  setTimeout(function(){
     swipes();
-    renderAZIndex('pl',function(letter){
-      var items=document.querySelectorAll('#pl .row,.sw');
-      var target=null;
-      items.forEach(function(el){
-        if(!target){
-          var rt=el.querySelector('.rt');
-          if(rt&&rt.textContent.toUpperCase().startsWith(letter))target=el;
-        }
-      });
-      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
-      else toast('No properties starting with '+letter);
-    });
+    renderPropsAZ();
   },80);
+}
+
+function renderPropsAZ(){
+  // Build street index from current filtered set
+  var all=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');});
+  // Get unique first letters from street names
+  var letters=[...new Set(all.map(function(p){return(p.s||p.a||'?').charAt(0).toUpperCase();}))].sort();
+
+  renderAZIndex('pl',function(letter){
+    // Filter properties whose street starts with this letter
+    var matched=all.filter(function(p){
+      return(p.s||p.a||'').toUpperCase().startsWith(letter);
+    });
+    if(matched.length===0){toast('No streets starting with '+letter);return;}
+
+    // Get unique streets for this letter
+    var streets=[...new Set(matched.map(function(p){return p.s||''}))].sort();
+
+    // Build grouped view by street
+    var l=$('pl');if(!l)return;
+    var html='<div style="padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10">';
+    html+='<div><span style="font-size:13px;font-weight:800;color:var(--teal);letter-spacing:1px">'+letter+' — '+streets.length+' streets · '+matched.length+' properties</span></div>';
+    html+='<button onclick="clearPropsAZ()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--muted);cursor:pointer;touch-action:manipulation">✕ All</button>';
+    html+='</div>';
+
+    // Group by street with collapsible headers
+    streets.forEach(function(street){
+      var sProps=matched.filter(function(p){return(p.s||'')=== street;});
+      html+='<div style="padding:8px 16px;background:var(--gdbg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">';
+      html+='<span style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.5px">📍 '+street+'</span>';
+      html+='<span style="font-size:11px;color:var(--muted)">'+sProps.length+' owners</span>';
+      html+='</div>';
+      html+=sProps.slice(0,30).map(pRow).join('');
+      if(sProps.length>30){
+        html+='<div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+'+( sProps.length-30)+' more — use search to filter</div>';
+      }
+    });
+
+    l.innerHTML=html;
+    var scr=$('scr');if(scr)scr.scrollTop=0;
+    setTimeout(function(){swipes();},50);
+    toast(matched.length+' properties — streets starting with '+letter);
+  });
+}
+
+function clearPropsAZ(){
+  S.pgSz=40;
+  var res=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');}).slice(0,S.pgSz);
+  var l=$('pl');
+  if(l)l.innerHTML=res.length===0
+    ?'<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No results</div></div>'
+    :res.map(pRow).join('');
+  setTimeout(function(){swipes();renderPropsAZ();},80);
+  toast('Showing all properties');
+}
+
+function apF(k,v){if(k==='status')S.fst=v;else S.fstr=v;S.pgSz=40;rProps();}
+function moreP(){
+  S.pgSz+=40;
+  var res=filt().sort(function(a,b){return(a.s||a.a||'').localeCompare(b.s||b.a||'');}).slice(0,S.pgSz);
+  var l=$('pl');
+  if(l)l.innerHTML=res.map(pRow).join('');
+  setTimeout(function(){swipes();renderPropsAZ();},80);
 }
 
 function pRow(p){
