@@ -428,6 +428,18 @@ button,a,.tab,.qa-chip,.stat-card,.chip,.row{-webkit-tap-highlight-color:transpa
 #splash-dot span:nth-child(2){animation-delay:.2s;}
 #splash-dot span:nth-child(3){animation-delay:.4s;}
 @keyframes pulse{0%,80%,100%{transform:scale(0.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:scale(1)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.home-hero{animation:fadeSlideUp .5s ease both}
+.stat-grid .sc{animation:scaleIn .4s ease both}
+.stat-grid .sc:nth-child(1){animation-delay:.05s}
+.stat-grid .sc:nth-child(2){animation-delay:.1s}
+.stat-grid .sc:nth-child(3){animation-delay:.15s}
+.stat-grid .sc:nth-child(4){animation-delay:.2s}
+.section-hdr{animation:fadeSlideUp .4s ease .25s both}
+.card-list{animation:fadeSlideUp .4s ease .3s both}
 </style>
 </head>
 <body class="light">
@@ -747,6 +759,7 @@ function rHome(){
     '<div class="qa-chip" onclick="refreshListingAlerts()" style="touch-action:manipulation"><span>🔔</span>Refresh Alerts</div>'+
     '<div class="qa-chip" onclick="showPFSetup()" style="touch-action:manipulation"><span>🔑</span>Pricefinder</div>'+
     '<div class="qa-chip" onclick="showSyncModal()"><span>🔄</span>Sync Data</div>'+
+    '<div class="qa-chip" onclick="showCloudSyncInfo()" style="background:linear-gradient(135deg,var(--teal),#0d8f8a);color:#fff"><span>☁️</span>Cloud Sync</div>'+
   '</div>'+
   // UPCOMING APPRAISALS
   '<div class="section-hdr"><span class="section-lbl">Upcoming Appraisals</span><button class="section-link" onclick="go(\'appt\')">See all →</button></div>'+
@@ -895,9 +908,17 @@ function addStrSm(s){var a=gSA();var pp=gP().filter(function(p){return p.s===s&&
 
 function addSaleM(){
   var sts=[...new Set(gP().map(function(p){return p.s;}))].sort();
-  modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">🏡 Log Area Activity</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Type</div><select class="fs" id="sat"><option value="sold">Property Sold</option><option value="listed">New Listing</option></select></div><div class="fg"><div class="fl">Address</div><input class="fi" id="saa" placeholder="e.g. 45 Hillview Rd"></div><div class="fg"><div class="fl">Street</div><select class="fs" id="sas"><option value="">Select…</option>'+sts.map(function(s){return'<option value="'+esc(s)+'">'+s+'</option>';}).join('')+'</select></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveSaleAlert()">Add to Smart Calls</button></div></div>');
+  modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">🏡 Log Area Activity</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd">' +
+    '<div class="fg"><div class="fl">Type</div><select class="fs" id="sat"><option value="sold">Property Sold</option><option value="listed">New Listing</option></select></div>' +
+    '<div class="fg"><div class="fl">Address</div><input class="fi" id="saa" placeholder="e.g. 45 Hillview Rd, Greenvale"></div>' +
+    '<div class="fg"><div class="fl">Street <span style="font-size:11px;color:var(--muted);font-weight:400">(select existing or type new)</span></div>' +
+      '<input class="fi" id="sas-input" placeholder="Type street name..." list="sas-list" style="margin-bottom:4px" oninput="document.getElementById(\'sas-custom\').value=this.value">' +
+      '<datalist id="sas-list">'+sts.map(function(s){return'<option value="'+esc(s)+'">'+s+'</option>';}).join('')+'</datalist>' +
+      '<input type="hidden" id="sas-custom">' +
+    '</div>' +
+    '</div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveSaleAlert()">Add to Smart Calls</button></div></div>');
 }
-function saveSaleAlert(){var t=$('sat').value,a=$('saa').value,s=$('sas').value;if(!a||!s){toast('Fill in address and street');return;}var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');var nb=gP().filter(function(p){return p.s===s&&!p.archived;}).length;alts.unshift({type:t,addr:a,street:s,nb:nb,date:new Date().toISOString()});localStorage.setItem('sa_alts',JSON.stringify(alts.slice(0,10)));addStrSm(s);cls();toast(nb+' owners added to Smart Calls');}
+function saveSaleAlert(){var t=$('sat').value,a=$('saa').value,s=($('sas-input')||{value:''}).value||($('sas-custom')||{value:''}).value||'';if(!a||!s){toast('Fill in address and street');return;}var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');var nb=gP().filter(function(p){return p.s===s&&!p.archived;}).length;alts.unshift({type:t,addr:a,street:s,nb:nb,date:new Date().toISOString()});localStorage.setItem('sa_alts',JSON.stringify(alts.slice(0,10)));addStrSm(s);cls();toast(nb+' owners added to Smart Calls');}
 
 /* ── PROPERTIES ── */
 function filt(){var pp=gP().filter(function(p){return!p.archived;});if(S.fstr)pp=pp.filter(function(p){return p.s===S.fstr;});if(S.fst)pp=pp.filter(function(p){return p.status===S.fst;});if(S.fq){var q=S.fq.toLowerCase();pp=pp.filter(function(p){return(p.a||'').toLowerCase().includes(q)||(p.n||'').toLowerCase().includes(q)||(p.p||'').includes(q)||(p.e||'').toLowerCase().includes(q);});}return pp;}
@@ -2017,7 +2038,12 @@ function addBuyerM(){
 function saveBuyer(){
   var n=$('byn').value.trim();if(!n){toast('Enter a name');return;}
   var b={id:Date.now(),name:n,phone:fmtPh($('byp').value),email:$('bye').value,enquiry:$('byq').value,budget:$('byb').value,notes:$('bno').value,created:new Date().toISOString()};
-  gB().push(b);sB();cls();toast('Buyer added ✓');rBuyers();
+  gB().push(b);sB();
+  // Auto-save buyer as contact
+  var bc2={id:'c'+b.id,name:b.name,phone:b.phone,email:b.email,address:'',notes:'BUYER — '+b.enquiry+(b.budget?' | Budget: '+b.budget:''),isBuyer:true,buyerId:b.id};
+  var existC=gC().find(function(c){return c.phone&&c.phone===b.phone;});
+  if(!existC&&b.name){gC().push(bc2);sC();}
+  cls();toast('Buyer added ✓');rBuyers();
 }
 
 function editBuyerM(id){
@@ -2035,7 +2061,11 @@ function editBuyerM(id){
 function saveBuyerEdit(id){
   var b=gB().find(function(x){return x.id===id;});if(!b)return;
   b.name=$('byn').value;b.phone=fmtPh($('byp').value);b.email=$('bye').value;b.enquiry=$('byq').value;b.budget=$('byb').value;b.notes=$('bno').value;
-  sB();cls();toast('Saved ✓');rBuyers();
+  sB();
+  // Sync to contacts
+  var bc2=gC().find(function(c){return c.buyerId===id;});
+  if(bc2){bc2.name=b.name;bc2.phone=b.phone;bc2.email=b.email;bc2.notes='BUYER — '+b.enquiry+(b.budget?' | Budget: '+b.budget:'');sC();}
+  cls();toast('Saved ✓');rBuyers();
 }
 
 function delBuyer(id){if(!confirm('Delete buyer?'))return;_buyers=gB().filter(function(b){return b.id!==id;});sB();toast('Deleted');rBuyers();}
@@ -2127,6 +2157,34 @@ function listingSMS(id){
   var msg='Hi '+fn+', this is Alex from Luxe Properties Melbourne. Just reaching out with an update on your property campaign at '+l.address+'. Please feel free to call me anytime on 0434 342 390.';
   window.open('sms:'+l.phone+'?body='+encodeURIComponent(msg),'_self');
   gI().push({id:Date.now(),type:'sms',name:l.vendor,phone:l.phone,outcome:'sent',notes:'Listing vendor SMS',date:new Date().toISOString()});sI();toast('💬 SMS logged');
+}
+
+
+function showCloudSyncInfo(){
+  modal('<div class="sht"><div class="sht-h"></div>' +
+    '<div class="sht-hdr"><div><div class="sht-ttl">☁️ Cross-Device Sync</div><div class="sht-sub">Keep phone & laptop in sync</div></div><button class="sht-x" onclick="cls()">✕</button></div>' +
+    '<div class="sht-bd">' +
+      '<div style="background:var(--gnbg);border:1.5px solid var(--green);border-radius:14px;padding:14px;margin-bottom:14px">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Best Method — Bookmark the URL</div>' +
+        '<div style="font-size:13px;color:var(--text);line-height:1.6">Open <strong>dmks100s.github.io/lp-app</strong> on both devices. Use the Export/Import buttons below to transfer data between devices.</div>' +
+      '</div>' +
+      '<div style="background:var(--blbg);border:1.5px solid var(--blue);border-radius:14px;padding:14px;margin-bottom:14px">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px">📱 Add to iPhone Home Screen</div>' +
+        '<div style="font-size:13px;color:var(--text);line-height:1.6">In Safari: tap Share → Add to Home Screen. Opens full-screen like a native app — no App Store needed.</div>' +
+      '</div>' +
+      '<div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🔄 Manual Sync (Current Method)</div>' +
+        '<div style="font-size:13px;color:var(--muted);line-height:1.6">Export JSON from one device → AirDrop or email to other device → Import. Takes 30 seconds.</div>' +
+      '</div>' +
+      '<div style="background:var(--gdbg);border:1.5px solid var(--gold);border-radius:14px;padding:14px">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">🚀 Future: Automatic Sync</div>' +
+        '<div style="font-size:13px;color:var(--muted);line-height:1.6">To enable real-time auto-sync across all devices, we can set up a free Supabase backend. Ask Alex to request this upgrade.</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="sht-ft">' +
+      '<button class="btn btn-gd btn-fw" onclick="cls();showSyncModal()">🔄 Export / Import Data</button>' +
+    '</div>' +
+  '</div>');
 }
 
 /* ── ADD MENUS ── */
@@ -2871,6 +2929,20 @@ async function refreshListingAlerts(){
 
 
 window.addEventListener('DOMContentLoaded',function(){
+  // Auto-fix past appraisals status on load (mark past confirmed as COMPLETED)
+  (function(){
+    var today=new Date();today.setHours(0,0,0,0);
+    var changed=false;
+    gA().forEach(function(a){
+      if(a.status==='CONFIRMED'&&!a.archived){
+        var d=parseApptDate(a.d||a.date||'');
+        if(d&&!isNaN(d)&&d<today){
+          a.status='COMPLETED';changed=true;
+        }
+      }
+    });
+    if(changed)sA();
+  })();
   // Hide splash screen
   var sp=document.getElementById('splash');
   if(sp){setTimeout(function(){sp.style.opacity='0';sp.style.transition='opacity 0.4s';setTimeout(function(){sp.remove();},400);},300);}
