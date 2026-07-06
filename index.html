@@ -440,6 +440,10 @@ button,a,.tab,.qa-chip,.stat-card,.chip,.row{-webkit-tap-highlight-color:transpa
 .stat-grid .sc:nth-child(4){animation-delay:.2s}
 .section-hdr{animation:fadeSlideUp .4s ease .25s both}
 .card-list{animation:fadeSlideUp .4s ease .3s both}
+
+.az-index{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:200;display:flex;flex-direction:column;padding:4px 2px;gap:1px;background:rgba(var(--bg-rgb,255,255,255),.85);backdrop-filter:blur(8px);border-radius:8px 0 0 8px;box-shadow:-2px 0 8px rgba(0,0,0,.08);}
+.az-letter{font-size:10px;font-weight:700;color:var(--muted);padding:2px 5px;cursor:pointer;text-align:center;border-radius:4px;touch-action:manipulation;line-height:1.2;min-width:16px;}
+.az-letter:active,.az-letter.hit{background:var(--teal);color:#fff;}
 </style>
 </head>
 <body class="light">
@@ -854,6 +858,7 @@ applyTheme();
 
 /* ── NAV ── */
 function go(pg,skipPrev){
+  removeAZIndex();
   if(!skipPrev)S.prev=S.pg;
   S.pg=pg;
   ['home','smart','props','contacts','appt','todo','search','log'].forEach(function(t){var e=$('t-'+t);if(e)e.classList.toggle('on',t===pg);});
@@ -1055,14 +1060,113 @@ function rSmart(){
   setTimeout(swipes,80);
 }
 
+
+/* ── SMART CALL INTELLIGENCE ── */
+function getNearbyStreets(street, limit) {
+  limit = limit || 5;
+  // Get all streets and find similar ones (same suburb prefix pattern)
+  var allStreets = [...new Set(gP().filter(function(p){return!p.archived;}).map(function(p){return p.s;}))];
+  var streetWord = street.split(' ')[0] || '';
+  // Score streets by proximity in list (alphabetical neighbours = geographic neighbours in suburbs)
+  var idx = allStreets.sort().indexOf(street);
+  var nearby = [];
+  if(idx >= 0) {
+    for(var i = Math.max(0, idx-3); i < Math.min(allStreets.length, idx+4); i++) {
+      if(allStreets[i] !== street) nearby.push(allStreets[i]);
+    }
+  }
+  // Also add streets starting with same first letter
+  allStreets.forEach(function(s){
+    if(s.charAt(0) === street.charAt(0) && s !== street && !nearby.includes(s)) nearby.push(s);
+  });
+  return nearby.slice(0, limit);
+}
+
+function generatePriorityCalls(street) {
+  var nearby = getNearbyStreets(street, 4);
+  var allStreets = [street].concat(nearby);
+  var arch = gSA();
+  // Un-archive all properties on these streets (make them priority)
+  var count = 0;
+  allStreets.forEach(function(s){
+    gP().filter(function(p){return p.s===s&&!p.archived;}).forEach(function(p){
+      var i = arch.indexOf(p.id);
+      if(i >= 0){ arch.splice(i,1); count++; }
+    });
+  });
+  sSA(arch);
+  return {streets: allStreets, count: count};
+}
+
 function renderSaleAlerts(){
-  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
-  if(!alts.length)return '<div class="sale-alert-empty"><span>No area activity logged</span><button onclick="addSaleM()">+ Add sale/listing</button></div>';
+  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]').filter(function(a){return !a.archived;});
+  if(!alts.length) return '<div class="sale-alert-empty"><span>No area activity logged</span><button onclick="addSaleM()">+ Add sale/listing</button></div>';
   return '<div class="sale-alerts">'+
-    '<div class="sale-alert-hdr">🏡 Recent Area Activity<button onclick="addSaleM()">+ Add</button></div>'+
-    alts.slice(0,2).map(function(a){return '<div class="sale-alert-row"><span>'+(a.type==='sold'?'🔨':'🏠')+'</span><div><strong>'+a.addr+'</strong><br>'+( a.type==='sold'?'Sold':'New listing')+' · '+a.street+' · '+a.nb+' nearby owners</div><button onclick="addStrSm(\''+esc(a.street)+'\')">Add</button></div>';}).join('')+
+    '<div class="sale-alert-hdr">🏡 Recent Area Activity <button onclick="addSaleM()">+ Add</button></div>'+
+    alts.slice(0,5).map(function(a,idx){
+      var nearby = getNearbyStreets(a.street, 3);
+      var nearbyCount = nearby.reduce(function(sum,s){return sum+gP().filter(function(p){return p.s===s&&!p.archived;}).length;},0);
+      return '<div class="sw" id="swalt'+idx+'">'+
+        '<div class="sw-acts">'+
+          (a.ownerPhone?'<div class="sa sa-gn" onclick="window.location.href=\'tel:'+a.ownerPhone+'\'"><span>📞</span>Call</div>':'')+ 
+          (a.ownerPhone?'<div class="sa sa-bl" onclick="window.open(\'sms:'+a.ownerPhone+'?body=Hi+'+encodeURIComponent((a.ownerName||'').split(' ')[0]||'there')+'\')"><span>💬</span>SMS</div>':'')+
+          '<div class="sa sa-gr" onclick="archAlt('+idx+')"><span>📦</span>Archive</div>'+
+        '</div>'+
+        '<div class="sale-alert-row row" id="saltr'+idx+'" onclick="showAltNearby(\''+esc(a.street)+'\',\''+esc(a.addr)+'\')" style="cursor:pointer">'+
+          '<span style="font-size:22px">'+(a.type==='sold'?'🔨':'🏠')+'</span>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-weight:700;font-size:14px;color:var(--text)">'+a.addr+'</div>'+
+            '<div style="font-size:12px;color:var(--muted)">'+(a.type==='sold'?'Sold':'New listing')+' · '+a.street+'</div>'+
+            (a.ownerName?'<div style="font-size:12px;color:var(--teal);font-weight:600">'+a.ownerName+(a.ownerPhone?' · '+a.ownerPhone:'')+'</div>':'')+
+            '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:2px">'+
+              a.nb+' on street · '+(nearbyCount)+' nearby · tap to prospect</div>'+
+          '</div>'+
+          '<button class="btn-teal-sm" style="flex-shrink:0;touch-action:manipulation" onclick="event.stopPropagation();var r=generatePriorityCalls(\''+esc(a.street)+'\');toast(r.count+\' priority calls added · \'+r.streets.length+\' streets\');rSmart()">▶ Priority</button>'+
+        '</div>'+
+      '</div>';
+    }).join('')+
   '</div>';
 }
+
+function archAlt(idx){
+  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  if(alts[idx])alts[idx].archived=true;
+  localStorage.setItem('sa_alts',JSON.stringify(alts));
+  rSmart();
+}
+
+function showAltNearby(street, addr){
+  var nearby = getNearbyStreets(street, 6);
+  var allS = [street].concat(nearby);
+  var props = [];
+  allS.forEach(function(s){
+    gP().filter(function(p){return p.s===s&&!p.archived;}).forEach(function(p){props.push(p);});
+  });
+  props.sort(function(a,b){return(a.s>b.s)?1:-1;});
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div><div class="sht-ttl">📍 Nearby — '+street+'</div>'+
+    '<div class="sht-sub">'+props.length+' owners to prospect</div></div>'+
+    '<button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div style="padding:8px 14px;display:flex;gap:8px">'+
+      '<button class="btn btn-gd" style="flex:1;font-size:13px;touch-action:manipulation" onclick="cls();var r=generatePriorityCalls(\''+esc(street)+'\');S.smSel=new Set();toast(r.count+\' added to Smart Calls\');go(\'smart\')">📞 Add All to Priority Calls</button>'+
+      '<button class="btn btn-bl" style="flex:1;font-size:13px;touch-action:manipulation" onclick="cls();window._bkOv=gP().filter(function(p){return['+allS.map(function(s){return'\''+s.replace(/'/g,"\\'")+'\''}).join(',')+'}.includes(p.s)&&!p.archived&&p.p);S.bkSel=new Set(window._bkOv.map(function(p){return p.id;}));S.prev=\'smart\';go(\'bulk\')">💬 Bulk SMS All</button>'+
+    '</div>'+
+    '<div style="overflow-y:auto;max-height:50vh">'+
+    props.slice(0,60).map(function(p){
+      return '<div class="row" style="cursor:pointer;touch-action:manipulation" onclick="cls();oProp('+p.id+')">'+
+        '<div class="av rnd '+avc(p.n)+'">'+ini(p.n)+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="rt">'+(p.n||'Unknown')+'</div>'+
+          '<div class="rs">'+(p.a||'')+'</div>'+
+          '<div style="font-size:10px;color:var(--muted)">'+p.s+'</div>'+
+        '</div>'+
+        (p.p?'<a href="tel:'+p.p+'" onclick="event.stopPropagation()" class="ibt gn" style="text-decoration:none;display:flex;align-items:center;justify-content:center;touch-action:manipulation;flex-shrink:0">📞</a>':'')+'</div>';
+    }).join('')+
+    '</div>'+
+    '<div class="sht-ft"><button class="btn btn-gh btn-fw" onclick="cls()">Close</button></div>'+
+  '</div>');
+}
+
 
 function smRow(p,isA){
   var hl=gH().filter(function(h){return!h.archived;});
@@ -1101,7 +1205,31 @@ function smRow(p,isA){
   '</div>';
 }
 
-function togSmSel(id){if(S.smSel.has(id))S.smSel.delete(id);else S.smSel.add(id);rSmart();}
+function togSmSel(id){
+  if(S.smSel.has(id)) S.smSel.delete(id); else S.smSel.add(id);
+  // Update DOM directly - no full rerender
+  var row=document.getElementById('swr'+id);
+  if(row){
+    var cb=row.querySelector('.bkc');
+    if(cb){cb.classList.toggle('on',S.smSel.has(id));cb.textContent=S.smSel.has(id)?'✓':'';}
+  }
+  // Update toolbar counts only
+  var tb=document.querySelector('.smart-toolbar');
+  if(tb){
+    var arch=gSA();var pp=gP().filter(function(p){return!p.archived;});var hl=gH().filter(function(h){return!h.archived;});
+    var all=[...new Map([...pp.filter(function(p){return p.isHot||hl.find(function(h){return h.a===p.a;})}),
+      ...pp.filter(function(p){return['callback','interested','voicemail','no_answer'].includes(p.status);})
+    ].map(function(p){return[p.id,p];})).values()].filter(function(p){return!arch.includes(p.id);});
+    var selBtn=tb.querySelector('button:first-child');
+    if(selBtn)selBtn.textContent=(S.smSel.size===all.length&&all.length>0)?'Deselect All':'☑ Select All';
+    var actions=tb.querySelectorAll('button');
+    if(S.smSel.size>0){
+      // Show count in bulk buttons
+      var smsBtn=tb.querySelector('button[onclick*="smBulkSMS"]');
+      if(smsBtn)smsBtn.textContent='💬 SMS '+S.smSel.size;
+    }
+  }
+}
 function smSelAll(){var arch=gSA();var pp=gP().filter(function(p){return!p.archived;});var hl=gH().filter(function(h){return!h.archived;});var all=[...new Map([...pp.filter(function(p){return p.isHot||hl.find(function(h){return h.a===p.a;});}),...pp.filter(function(p){return['callback','interested','voicemail','no_answer'].includes(p.status);})].map(function(p){return[p.id,p];})).values()].filter(function(p){return!arch.includes(p.id);});if(S.smSel.size===all.length)S.smSel=new Set();else S.smSel=new Set(all.map(function(p){return p.id;}));rSmart();}
 function smBulkSMS(){var sel=gP().filter(function(p){return S.smSel.has(p.id)&&p.p;});if(!sel.length){toast('No contacts with phones selected');return;}window._bkOv=sel;S.bkSel=new Set(sel.map(function(p){return p.id;}));S.prev='smart';go('bulk');}
 function smBulkArch(){var a=gSA();S.smSel.forEach(function(id){if(!a.includes(id))a.push(id);});sSA(a);S.smSel=new Set();toast('Archived');rSmart();}
@@ -1120,7 +1248,27 @@ function addSaleM(){
     '</div>' +
     '</div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveSaleAlert()">Add to Smart Calls</button></div></div>');
 }
-function saveSaleAlert(){var t=$('sat').value,a=$('saa').value,s=($('sas-input')||{value:''}).value||($('sas-custom')||{value:''}).value||'';if(!a||!s){toast('Fill in address and street');return;}var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');var nb=gP().filter(function(p){return p.s===s&&!p.archived;}).length;alts.unshift({type:t,addr:a,street:s,nb:nb,date:new Date().toISOString()});localStorage.setItem('sa_alts',JSON.stringify(alts.slice(0,10)));addStrSm(s);cls();toast(nb+' owners added to Smart Calls');}
+function saveSaleAlert(){
+  var t=$('sat').value,a=$('saa').value,s=($('sas-input')||{value:''}).value||($('sas-custom')||{value:''}).value||'';
+  if(!a||!s){toast('Fill in address and street');return;}
+  var ownerName=($('san')||{value:''}).value.trim();
+  var ownerPhone=fmtPh(($('sap')||{value:''}).value);
+  // Save new contact if provided
+  if(ownerName){
+    var ex=gP().find(function(p){return p.a.toUpperCase()===a.toUpperCase();});
+    if(!ex){
+      var np={id:Date.now(),a:a.toUpperCase(),s:s.toUpperCase(),n:ownerName,p:ownerPhone,e:'',no:'',status:'uncontacted',sb:'Melbourne',po:'',vtype:''};
+      gP().push(np);sP();
+    }
+    var ec=gC().find(function(c){return c.phone&&c.phone===ownerPhone;});
+    if(!ec&&ownerName){gC().push({id:'c'+Date.now(),name:ownerName,phone:ownerPhone,email:'',address:a,notes:'From area activity — '+(t==='sold'?'Sold':'Listed')});sC();}
+  }
+  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var nb=gP().filter(function(p){return p.s===s&&!p.archived;}).length;
+  alts.unshift({id:'alt'+Date.now(),type:t,addr:a,street:s,nb:nb,ownerName:ownerName,ownerPhone:ownerPhone,date:new Date().toISOString(),archived:false});
+  localStorage.setItem('sa_alts',JSON.stringify(alts.slice(0,20)));
+  addStrSm(s);cls();toast(nb+' owners added to Smart Calls');
+}
 
 /* ── PROPERTIES ── */
 function filt(){var pp=gP().filter(function(p){return!p.archived;});if(S.fstr)pp=pp.filter(function(p){return p.s===S.fstr;});if(S.fst)pp=pp.filter(function(p){return p.status===S.fst;});if(S.fq){var q=S.fq.toLowerCase();pp=pp.filter(function(p){return(p.a||'').toLowerCase().includes(q)||(p.n||'').toLowerCase().includes(q)||(p.p||'').includes(q)||(p.e||'').toLowerCase().includes(q);});}return pp;}
@@ -1439,7 +1587,19 @@ function rContacts(){
   '<div id="cl">'+(ff.length===0?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div><div class="empty-s">'+(q?'Try a different search':'Add contacts or they appear from your properties database')+'</div></div>':ff.slice(0,80).map(cRow).join(''))+'</div>'+
   '<div style="height:80px"></div>';
   srchBind('cs',function(){var q2=(S.cfq||'').toLowerCase().trim();var all2=allC();var ff2=q2?all2.filter(function(c){return(c.name||'').toLowerCase().includes(q2)||(c.phone||'').replace(/\s/g,'').includes(q2.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q2)||(c.address||'').toLowerCase().includes(q2);}):all2;var l=$('cl');if(l)l.innerHTML=ff2.slice(0,80).map(cRow).join('');setTimeout(swipes,50);},function(v){S.cfq=v;});
-  setTimeout(swipes,80);
+  setTimeout(function(){
+    swipes();
+    renderAZIndex('cl',function(letter){
+      var items=document.querySelectorAll('#cl .row');
+      var target=null;
+      items.forEach(function(row){
+        var name=row.querySelector('.rt');
+        if(name&&name.textContent.toUpperCase().startsWith(letter)&&!target)target=row;
+      });
+      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+      else toast('No contacts starting with '+letter);
+    });
+  },80);
 }
 function clrC(){S.cfq='';rContacts();}
 
@@ -2053,6 +2213,12 @@ function rLog(){
   html+='<div style="height:80px"></div>';
   $('scr').innerHTML=html;
 }
+
+function archLogItem(id){
+  var items=gI();var item=items.find(function(i){return i.id==id;});
+  if(item){item.archived=true;sI();toast('📦 Archived');rLog();}
+}
+
 function delLog(id){
   _ix=gI().filter(function(i){return String(i.id)!==String(id);});
   if(window._logSel)window._logSel.delete(String(id));
@@ -2131,7 +2297,7 @@ function rBulk(){
     (sel.size>0?'<span style="color:var(--teal)">'+sel.size+' selected</span>':'<span style="color:var(--muted)">0 selected</span>') + ' of '+pool.length+' contacts' +
   '</div>' +
   '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One message per contact · sent via Messages app</div>' +
-  '<input class="fi" id="bkqsearch" placeholder="Search contacts by name or street..." value="'+esc(S.bkQ||'')+'" oninput="S.bkQ=this.value;rBulk()" style="margin:0;font-size:16px">' +
+  '<input class="fi" id="bkqsearch" placeholder="Search contacts by name or street..." value="'+esc(S.bkQ||'')+'" autocomplete="off" autocorrect="off" spellcheck="false" style="margin:0;font-size:16px">' +
 '</div>'+
   (!ov?'<div style="padding:10px 14px;border-bottom:1px solid var(--border2);background:var(--card)"><div class="fl">Filter by Street</div><select class="fs" style="font-size:13px" onchange="S.bkStr=this.value;S.bkSel=new Set();window._bkOv=null;rBulk()"><option value="">All Streets ('+awp.length+' contacts)</option>'+sts.map(function(s){return'<option value="'+esc(s)+'"'+(S.bkStr===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>':'<div style="padding:10px 16px;background:var(--gdbg);border-bottom:1px solid var(--gold);font-size:12.5px;color:var(--gold);display:flex;align-items:center;justify-content:space-between">'+pool.length+' contacts from Smart Calls<button style="background:none;border:none;color:var(--gold);font-size:18px;cursor:pointer" onclick="window._bkOv=null;S.bkSel=new Set();rBulk()">✕</button></div>')+
   '<div style="padding:12px 14px;border-bottom:1px solid var(--border2);background:var(--card)"><div class="fl">Template</div>'+
@@ -2159,6 +2325,39 @@ function hotBulkSMS(){
   });
   if(!targets.length){toast('No contacts with phones in Hot List');return;}
   window._bkOv=targets;S.bkSel=new Set(targets.map(function(x){return x.id;}));S.prev='hot';go('bulk');
+}
+
+function bkBindSearch(){
+  srchBind('bkqsearch',function(){
+    var q=(S.bkQ||'').toLowerCase();
+    var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});
+    var rawPool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);
+    var pool=q?rawPool.filter(function(p){return(p.n||'').toLowerCase().includes(q)||(p.s||'').toLowerCase().includes(q)||(p.a||'').toLowerCase().includes(q);}) :rawPool;
+    var sel=S.bkSel;
+    var res=document.getElementById('bk-results');
+    if(!res)return;
+    res.innerHTML=pool.slice(0,200).map(function(p){
+      var chk=sel.has(p.id);
+      return '<div class="row" id="bkr'+p.id+'" style="cursor:pointer;touch-action:manipulation" onclick="togBkSel('+p.id+')">'+
+        '<div class="bkc'+(chk?' on':'')+'" style="flex-shrink:0;touch-action:manipulation">'+(chk?'✓':'')+'</div>'+
+        '<div class="av rnd '+avc(p.n)+'" style="flex-shrink:0">'+ini(p.n)+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="rt">'+(p.n||'Unknown')+'</div>'+
+        '<div class="rs">'+(p.a||p.s||'')+'</div></div>'+
+        (p.p?'<a href="tel:'+p.p+'" class="ibt gn" onclick="event.stopPropagation()" style="touch-action:manipulation;text-decoration:none;display:flex;align-items:center;justify-content:center">📞</a>':'')+'</div>';
+    }).join('')+
+    (pool.length===0?'<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No contacts found</div></div>':'');
+  },function(v){S.bkQ=v;});
+}
+
+function togBkSel(id){if(S.bkSel.has(id))S.bkSel.delete(id);else S.bkSel.add(id);
+  // Update just the checkbox without full rerender
+  var row=document.getElementById('bkr'+id);
+  if(row){var cb=row.querySelector('.bkc');if(cb){cb.classList.toggle('on',S.bkSel.has(id));cb.textContent=S.bkSel.has(id)?'✓':'';}};
+  // Update header count
+  var cnt=document.getElementById('bk-sel-count');
+  if(cnt)cnt.textContent=S.bkSel.size+' selected';
+  var sndBtn=document.getElementById('bk-send-btn');
+  if(sndBtn)sndBtn.disabled=S.bkSel.size===0;
 }
 
 function bkSelAll(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);S.bkSel=S.bkSel.size===pool.length?new Set():new Set(pool.map(function(p){return p.id;}));rBulk();}
@@ -2388,6 +2587,81 @@ function showCloudSyncInfo(){
       '<button class="btn btn-teal btn-fw" style="margin-top:8px" onclick="cls();showSupabaseSetup()">☁️ '+(sbReady()?'Supabase Connected ✅':'Connect Supabase Auto-Sync')+'</button>' +
     '</div>' +
   '</div>');
+}
+
+
+function renderAZIndex(containerId, getLetterFn){
+  var letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  var el=document.createElement('div');
+  el.className='az-index';
+  el.id='az-index';
+  letters.forEach(function(l){
+    var d=document.createElement('div');
+    d.className='az-letter';
+    d.textContent=l;
+    d.setAttribute('data-l',l);
+    d.addEventListener('click',function(){
+      d.classList.add('hit');setTimeout(function(){d.classList.remove('hit');},300);
+      getLetterFn(l);
+    });
+    el.appendChild(d);
+  });
+  // Remove existing
+  var old=document.getElementById('az-index');
+  if(old)old.remove();
+  document.body.appendChild(el);
+}
+
+function removeAZIndex(){var el=document.getElementById('az-index');if(el)el.remove();}
+
+
+function smartRefreshAlerts(){
+  // Simulate market intelligence using existing database
+  // Finds streets where multiple owners haven't been called recently
+  var pp=gP().filter(function(p){return!p.archived;});
+  var ix=gI();
+  var now=new Date();
+  var suburbs=['Greenvale','Roxburgh Park','Mickleham','Craigieburn','Donnybrook','Kalkallo','Sunbury'];
+  
+  // Find streets with high uncontacted owner density
+  var streetMap={};
+  pp.forEach(function(p){
+    if(!streetMap[p.s])streetMap[p.s]={street:p.s,suburb:p.sb||'',total:0,uncontacted:0,lastActivity:null};
+    streetMap[p.s].total++;
+    var lastCall=ix.filter(function(i){return i.propertyId===p.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0];
+    if(!lastCall)streetMap[p.s].uncontacted++;
+    else if(!streetMap[p.s].lastActivity||new Date(lastCall.date)>new Date(streetMap[p.s].lastActivity))
+      streetMap[p.s].lastActivity=lastCall.date;
+  });
+
+  // Get existing alerts
+  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var existStreets=alts.map(function(a){return a.street;});
+
+  // Generate smart alerts for high-value streets
+  var newAlerts=[];
+  Object.values(streetMap).sort(function(a,b){return b.uncontacted-a.uncontacted;}).slice(0,8).forEach(function(st){
+    if(!existStreets.includes(st.street)&&st.uncontacted>=3){
+      newAlerts.push({
+        id:'alt'+Date.now()+Math.random().toString(36).slice(2),
+        type:'opportunity',
+        addr:'📊 '+st.uncontacted+' uncontacted owners',
+        street:st.street,
+        nb:st.total,
+        ownerName:'',ownerPhone:'',
+        date:new Date().toISOString(),
+        archived:false,
+        isAlert:true
+      });
+    }
+  });
+
+  if(newAlerts.length===0){toast('Database already up to date');return;}
+  var combined=newAlerts.concat(alts).slice(0,20);
+  localStorage.setItem('sa_alts',JSON.stringify(combined));
+  toast('🔔 '+newAlerts.length+' new prospecting opportunities found');
+  if(S.pg==='smart')rSmart();
+  else go('smart');
 }
 
 /* ── ADD MENUS ── */
