@@ -2155,14 +2155,14 @@ function downloadICS(appt){
       String(dt.getUTCHours()).padStart(2,'0')+
       String(dt.getUTCMinutes()).padStart(2,'0')+'00Z';
   };
-  var esc=function(s){return(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');};
-  var summary=esc('Appraisal — '+(appt.a||'Property'));
-  var location=esc(appt.a||'');
+  var escICS=function(s){return(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');};
+  var summary=escICS('Appraisal — '+(appt.a||'Property'));
+  var location=escICS(appt.a||'');
   var desc='Property Appraisal\\nOwner: '+(appt.n||'TBC');
   if(appt.p)desc+='\\nPhone: '+appt.p;
   if(appt.notes)desc+='\\n\\nNotes: '+appt.notes;
   desc+='\\n\\n— Luxe Properties Melbourne';
-  desc=esc(desc).replace(/\\\\n/g,'\\n');
+  desc=escICS(desc).replace(/\\\\n/g,'\\n');
   var uid='luxe-'+(appt.id||Date.now())+'@luxepropertiesmelbourne.com.au';
   var ics='BEGIN:VCALENDAR\r\n'+
     'VERSION:2.0\r\n'+
