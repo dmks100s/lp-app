@@ -1619,56 +1619,143 @@ function saveAppraisalReminder(){var addr=($('arat')||{}).value,task=($('artask'
 function allC(){var m=gC();var fp=gP().filter(function(p){return p.n&&p.p&&!p.archived;}).map(function(p){return{id:'p'+p.id,name:p.n,phone:p.p,email:p.e||'',address:p.a,src:'prop',pid:p.id,status:p.status,vtype:p.vtype||''};});return[...m,...fp].sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});}
 
 function rContacts(){
-  var q=(S.cfq||'').toLowerCase().trim();var all=allC();
-  var ff=q?all.filter(function(c){return(c.name||'').toLowerCase().includes(q)||(c.phone||'').replace(/\s/g,'').includes(q.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q)||(c.address||'').toLowerCase().includes(q);}):all;
+  var q=(S.cfq||'').toLowerCase().trim();
+  var all=allC();
+  var ff=q?all.filter(function(c){
+    return(c.name||'').toLowerCase().includes(q)||
+      (c.phone||'').replace(/\s/g,'').includes(q.replace(/\s/g,''))||
+      (c.email||'').toLowerCase().includes(q)||
+      (c.address||'').toLowerCase().includes(q);
+  }):all;
+
+  // Store filtered list globally for load-more and AZ
+  window._cFF=ff;
+  window._cShown=0;
+
   $('scr').innerHTML=
-  '<div class="sb"><div class="sb-in"><span class="sb-ic">⌕</span><input id="cs" type="text" placeholder="Search name, phone, email…" value="'+(S.cfq||'').replace(/"/g,'&quot;')+'" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="words" inputmode="search">'+(S.cfq?'<span class="sb-x" onclick="clrC()">✕</span>':'')+'</div></div>'+
-  '<div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">'+
-    '<span>'+ff.length+' contacts'+(q?' for "'+S.cfq+'"':'')+'</span>'+
-    '<div style="display:flex;gap:12px"><button class="slnk" onclick="importContM()">⬆ Import</button><button class="slnk" onclick="exportCont()">⬇ Export</button><button class="slnk" onclick="addContM()">+ Add</button></div>'+
-  '</div>'+
-  '<div id="cl">'+(ff.length===0?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div><div class="empty-s">'+(q?'Try a different search':'Add contacts or they appear from your properties database')+'</div></div>':ff.slice(0,150).map(cRow).join('')+(ff.length>150?'<div id="load-more-c" style="text-align:center;padding:16px;color:var(--muted);font-size:13px" onclick="loadMoreContacts()">Load more ('+( ff.length-150)+' remaining) ›</div>':''))+'</div>'+
-  '<div style="height:80px"></div>';
-  srchBind('cs',function(){var q2=(S.cfq||'').toLowerCase().trim();var all2=allC();var ff2=q2?all2.filter(function(c){return(c.name||'').toLowerCase().includes(q2)||(c.phone||'').replace(/\s/g,'').includes(q2.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q2)||(c.address||'').toLowerCase().includes(q2);}):all2;var l=$('cl');if(l)l.innerHTML=ff2.slice(0,150).map(cRow).join('')+(ff2.length>150?'<div id="load-more-c" style="text-align:center;padding:16px;color:var(--muted);font-size:13px" onclick="loadMoreContacts()">Load more ('+( ff2.length-150)+' remaining) ›</div>':'');setTimeout(swipes,50);},function(v){S.cfq=v;});
+    '<div class="sb"><div class="sb-in"><span class="sb-ic">⌕</span>'+
+    '<input id="cs" type="text" placeholder="Search '+all.length+' contacts…" value="'+(S.cfq||'').replace(/"/g,'&quot;')+'" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="words" inputmode="search">'+
+    (S.cfq?'<span class="sb-x" onclick="clrC()">✕</span>':'')+
+    '</div></div>'+
+    '<div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">'+
+      '<span><strong style="color:var(--text)">'+ff.length.toLocaleString()+'</strong> contacts'+(q?' for "'+esc(S.cfq)+'"':'')+'</span>'+
+      '<div style="display:flex;gap:12px">'+
+        '<button class="slnk" onclick="importContM()">⬆ Import</button>'+
+        '<button class="slnk" onclick="exportCont()">⬇ Export</button>'+
+        '<button class="slnk" onclick="addContM()">+ Add</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="cl">'+
+      (ff.length===0
+        ?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div></div>'
+        :'')+
+    '</div>'+
+    '<div id="cl-sentinel" style="height:1px"></div>'+
+    '<div style="height:80px"></div>';
+
+  // Initial render
+  cLoadMore();
+
+  // Infinite scroll via IntersectionObserver
+  var sentinel=document.getElementById('cl-sentinel');
+  if(sentinel&&window.IntersectionObserver){
+    if(window._cObserver)window._cObserver.disconnect();
+    window._cObserver=new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting)cLoadMore();
+    },{rootMargin:'200px'});
+    window._cObserver.observe(sentinel);
+  }
+
+  // Search bind
+  srchBind('cs',function(){
+    var q2=(S.cfq||'').toLowerCase().trim();
+    var all2=allC();
+    var ff2=q2?all2.filter(function(c){
+      return(c.name||'').toLowerCase().includes(q2)||
+        (c.phone||'').replace(/\s/g,'').includes(q2.replace(/\s/g,''))||
+        (c.email||'').toLowerCase().includes(q2)||
+        (c.address||'').toLowerCase().includes(q2);
+    }):all2;
+    window._cFF=ff2;
+    window._cShown=0;
+    var l=$('cl');
+    if(l){
+      l.innerHTML=ff2.length===0
+        ?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">No results</div></div>'
+        :'';
+      if(ff2.length>0)cLoadMore();
+    }
+    // Update count
+    var cnt=document.querySelector('#scr strong');
+    if(cnt)cnt.textContent=ff2.length.toLocaleString();
+    setTimeout(swipes,50);
+  },function(v){S.cfq=v;});
+
+  // AZ Index - jumps to letter in full dataset
   setTimeout(function(){
     swipes();
     renderAZIndex('cl',function(letter){
-      var items=document.querySelectorAll('#cl .row');
-      var target=null;
-      items.forEach(function(row){
-        var name=row.querySelector('.rt');
-        if(name&&name.textContent.toUpperCase().startsWith(letter)&&!target)target=row;
+      // Find first visible contact with this letter
+      var rows=document.querySelectorAll('#cl .row');
+      var found=null;
+      rows.forEach(function(r){
+        if(!found){var rt=r.querySelector('.rt');
+          if(rt&&rt.textContent.trim().toUpperCase().startsWith(letter))found=r;}
       });
-      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
-      else toast('No contacts starting with '+letter);
+      if(found){found.scrollIntoView({behavior:'smooth',block:'start'});return;}
+      // Not loaded yet - load until we find it
+      var ff3=window._cFF||[];
+      var targetIdx=ff3.findIndex(function(c){return(c.name||'').toUpperCase().startsWith(letter);});
+      if(targetIdx<0){toast('No contacts starting with '+letter);return;}
+      // Load contacts up to that index
+      var l=$('cl');if(!l)return;
+      while(window._cShown<=targetIdx){
+        var batch=ff3.slice(window._cShown,window._cShown+100);
+        if(!batch.length)break;
+        batch.forEach(function(c){
+          var div=document.createElement('div');
+          div.innerHTML=cRow(c);
+          if(div.firstChild)l.insertBefore(div.firstChild,l.lastElementChild);
+        });
+        window._cShown+=batch.length;
+      }
+      // Now scroll
+      setTimeout(function(){
+        var rows2=document.querySelectorAll('#cl .row');
+        var found2=null;
+        rows2.forEach(function(r){
+          if(!found2){var rt=r.querySelector('.rt');
+            if(rt&&rt.textContent.trim().toUpperCase().startsWith(letter))found2=r;}
+        });
+        if(found2)found2.scrollIntoView({behavior:'smooth',block:'start'});
+        else toast('No contacts starting with '+letter);
+        setTimeout(swipes,50);
+      },100);
     });
   },80);
 }
 
-function loadMoreContacts(){
-  var q=(S.cfq||'').toLowerCase().trim();
-  var all=allC();
-  var ff=q?all.filter(function(c){return(c.name||'').toLowerCase().includes(q)||(c.phone||'').replace(/\s/g,'').includes(q.replace(/\s/g,''))||(c.email||'').toLowerCase().includes(q)||(c.address||'').toLowerCase().includes(q);}):all;
+function cLoadMore(){
+  var ff=window._cFF;
+  if(!ff||!ff.length)return;
   var l=$('cl');if(!l)return;
-  var shown=l.querySelectorAll('.sw').length;
-  var next=ff.slice(shown,shown+150);
-  var lm=document.getElementById('load-more-c');if(lm)lm.remove();
-  next.forEach(function(c){
+  var shown=window._cShown||0;
+  if(shown>=ff.length)return;
+  var batch=ff.slice(shown,shown+100);
+  var frag=document.createDocumentFragment();
+  batch.forEach(function(c){
     var div=document.createElement('div');
     div.innerHTML=cRow(c);
-    l.appendChild(div.firstChild);
+    if(div.firstChild)frag.appendChild(div.firstChild);
   });
-  var remaining=ff.length-(shown+next.length);
-  if(remaining>0){
-    var btn=document.createElement('div');
-    btn.id='load-more-c';
-    btn.style.cssText='text-align:center;padding:16px;color:var(--muted);font-size:13px;cursor:pointer';
-    btn.textContent='Load more ('+remaining+' remaining) ›';
-    btn.onclick=loadMoreContacts;
-    l.appendChild(btn);
-  }
-  setTimeout(swipes,50);
+  // Insert before sentinel
+  var sentinel=document.getElementById('cl-sentinel');
+  if(sentinel)l.insertBefore(frag,sentinel);
+  else l.appendChild(frag);
+  window._cShown=shown+batch.length;
+  setTimeout(swipes,30);
 }
+
 
 function clrC(){S.cfq='';rContacts();}
 
