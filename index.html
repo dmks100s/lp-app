@@ -1649,8 +1649,8 @@ function rContacts(){
       (ff.length===0
         ?'<div class="empty"><div class="empty-i">👤</div><div class="empty-t">'+(q?'No results':'No contacts')+'</div></div>'
         :'')+
+      '<div id="cl-sentinel" style="height:1px"></div>'+
     '</div>'+
-    '<div id="cl-sentinel" style="height:1px"></div>'+
     '<div style="height:80px"></div>';
 
   // Initial render
@@ -1730,11 +1730,23 @@ function rContacts(){
       
       // Store filter state
       window._cAZLetter=letter;
+      // Add sentinel at end for scroll detection
+      frag+='<div id="cl-sentinel" style="height:1px"></div>';
       l.innerHTML=frag;
-      l.scrollTop=0;
       // Scroll scr to top
       var scr=$('scr');if(scr)scr.scrollTop=0;
-      setTimeout(function(){swipes();},50);
+      setTimeout(function(){
+        swipes();
+        // Restart observer for this letter's results
+        var sentinel=document.getElementById('cl-sentinel');
+        if(sentinel&&window.IntersectionObserver){
+          if(window._cObserver)window._cObserver.disconnect();
+          window._cObserver=new IntersectionObserver(function(entries){
+            if(entries[0].isIntersecting)cLoadMore();
+          },{rootMargin:'200px'});
+          window._cObserver.observe(sentinel);
+        }
+      },50);
       toast(letterContacts.length+' contacts — '+letter);
     });
   },80);
@@ -1744,10 +1756,20 @@ function rContacts(){
 function clrAZFilter(){
   window._cAZLetter=null;
   var l=$('cl');if(!l)return;
-  l.innerHTML='';
+  // Rebuild sentinel before loading
+  l.innerHTML='<div id="cl-sentinel" style="height:1px"></div>';
   window._cShown=0;
   cLoadMore();
   var scr=$('scr');if(scr)scr.scrollTop=0;
+  // Restart IntersectionObserver
+  var sentinel=document.getElementById('cl-sentinel');
+  if(sentinel&&window.IntersectionObserver){
+    if(window._cObserver)window._cObserver.disconnect();
+    window._cObserver=new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting)cLoadMore();
+    },{rootMargin:'200px'});
+    window._cObserver.observe(sentinel);
+  }
   toast('Showing all contacts');
 }
 
@@ -1764,10 +1786,12 @@ function cLoadMore(){
     div.innerHTML=cRow(c);
     if(div.firstChild)frag.appendChild(div.firstChild);
   });
-  // Insert before sentinel
+  // Safely insert before sentinel, or append if not found
   var sentinel=document.getElementById('cl-sentinel');
-  if(sentinel)l.insertBefore(frag,sentinel);
-  else l.appendChild(frag);
+  try {
+    if(sentinel&&sentinel.parentNode===l) l.insertBefore(frag,sentinel);
+    else l.appendChild(frag);
+  } catch(e){ l.appendChild(frag); }
   window._cShown=shown+batch.length;
   setTimeout(swipes,30);
 }
