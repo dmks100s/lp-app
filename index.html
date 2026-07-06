@@ -1695,44 +1695,60 @@ function rContacts(){
   setTimeout(function(){
     swipes();
     renderAZIndex('cl',function(letter){
-      // Find first visible contact with this letter
-      var rows=document.querySelectorAll('#cl .row');
+      var ff3=window._cFF||[];
+      // Find all contacts starting with this letter
+      var letterContacts=ff3.filter(function(c){
+        return(c.name||'').toUpperCase().startsWith(letter);
+      });
+      if(letterContacts.length===0){toast('No contacts starting with '+letter);return;}
+      
+      // Check if any are already rendered
+      var rows=document.querySelectorAll('#cl .sw');
       var found=null;
       rows.forEach(function(r){
-        if(!found){var rt=r.querySelector('.rt');
-          if(rt&&rt.textContent.trim().toUpperCase().startsWith(letter))found=r;}
+        if(!found){
+          var rt=r.querySelector('.rt');
+          if(rt&&rt.textContent.trim().toUpperCase().startsWith(letter))found=r;
+        }
       });
       if(found){found.scrollIntoView({behavior:'smooth',block:'start'});return;}
-      // Not loaded yet - load until we find it
-      var ff3=window._cFF||[];
-      var targetIdx=ff3.findIndex(function(c){return(c.name||'').toUpperCase().startsWith(letter);});
-      if(targetIdx<0){toast('No contacts starting with '+letter);return;}
-      // Load contacts up to that index
+      
+      // Not rendered yet — show JUST this letter's contacts
+      // Replace current view with letter-filtered contacts
       var l=$('cl');if(!l)return;
-      while(window._cShown<=targetIdx){
-        var batch=ff3.slice(window._cShown,window._cShown+100);
-        if(!batch.length)break;
-        batch.forEach(function(c){
-          var div=document.createElement('div');
-          div.innerHTML=cRow(c);
-          if(div.firstChild)l.insertBefore(div.firstChild,l.lastElementChild);
-        });
-        window._cShown+=batch.length;
+      
+      // Show letter heading + contacts
+      var frag='<div style="padding:10px 16px;font-size:11px;font-weight:800;color:var(--teal);letter-spacing:2px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10">'+
+        letter+' — '+letterContacts.length+' contacts '+
+        '<span style="font-weight:400;color:var(--muted);font-size:11px;letter-spacing:0">(tap ✕ to show all)</span>'+
+        '<button onclick="clrAZFilter()" style="float:right;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;touch-action:manipulation;padding:0 4px">✕</button>'+
+      '</div>';
+      frag+=letterContacts.slice(0,200).map(cRow).join('');
+      if(letterContacts.length>200){
+        frag+='<div style="text-align:center;padding:12px;color:var(--muted);font-size:13px">+'+( letterContacts.length-200)+' more — refine search to narrow</div>';
       }
-      // Now scroll
-      setTimeout(function(){
-        var rows2=document.querySelectorAll('#cl .row');
-        var found2=null;
-        rows2.forEach(function(r){
-          if(!found2){var rt=r.querySelector('.rt');
-            if(rt&&rt.textContent.trim().toUpperCase().startsWith(letter))found2=r;}
-        });
-        if(found2)found2.scrollIntoView({behavior:'smooth',block:'start'});
-        else toast('No contacts starting with '+letter);
-        setTimeout(swipes,50);
-      },100);
+      
+      // Store filter state
+      window._cAZLetter=letter;
+      l.innerHTML=frag;
+      l.scrollTop=0;
+      // Scroll scr to top
+      var scr=$('scr');if(scr)scr.scrollTop=0;
+      setTimeout(function(){swipes();},50);
+      toast(letterContacts.length+' contacts — '+letter);
     });
   },80);
+}
+
+
+function clrAZFilter(){
+  window._cAZLetter=null;
+  var l=$('cl');if(!l)return;
+  l.innerHTML='';
+  window._cShown=0;
+  cLoadMore();
+  var scr=$('scr');if(scr)scr.scrollTop=0;
+  toast('Showing all contacts');
 }
 
 function cLoadMore(){
