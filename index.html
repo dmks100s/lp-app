@@ -862,6 +862,7 @@ function rHome(){
     '<div class="qa-chip" onclick="showPFSetup()" style="touch-action:manipulation"><span>🔑</span>Pricefinder</div>'+
     '<div class="qa-chip" onclick="showSyncModal()"><span>🔄</span>Sync Data</div>'+
     '<div class="qa-chip" onclick="showCloudSyncInfo()" style="background:linear-gradient(135deg,var(--teal),#0d8f8a);color:#fff"><span>☁️</span>Cloud Sync</div>'+
+    '<div class="qa-chip" onclick="showGoogleContactsSync()" style="background:linear-gradient(135deg,#4285F4,#1A73E8);color:#fff;touch-action:manipulation"><span>📱</span>Google Contacts</div>'+
   '</div>'+
   // UPCOMING APPRAISALS
   '<div class="section-hdr"><span class="section-lbl">Upcoming Appraisals</span><button class="section-link" onclick="go(\'appt\')">See all →</button></div>'+
@@ -2816,6 +2817,366 @@ function smartRefreshAlerts(){
   if(S.pg==='smart')rSmart();
   else go('smart');
 }
+
+
+/* ══════════════════════════════════════════════════════
+   GOOGLE CONTACTS SYNC ENGINE
+   Uses Google People API with OAuth 2.0
+   ══════════════════════════════════════════════════════ */
+
+var GC = {
+  clientId: '',          // Set by user
+  accessToken: '',       // OAuth token
+  tokenExpiry: 0,        // Token expiry timestamp
+  lastSync: null,        // Last sync time
+  autoSyncTimer: null    // Auto-sync interval
+};
+
+// Load saved credentials
+(function(){
+  GC.clientId = localStorage.getItem('gc_client_id') || '';
+  GC.accessToken = localStorage.getItem('gc_token') || '';
+  GC.tokenExpiry = parseInt(localStorage.getItem('gc_token_expiry') || '0');
+  var ls = localStorage.getItem('gc_last_sync');
+  GC.lastSync = ls ? new Date(ls) : null;
+})();
+
+function gcReady(){
+  return !!(GC.accessToken && GC.tokenExpiry > Date.now());
+}
+
+// ── Show setup / sync modal ──
+function showGoogleContactsSync(){
+  var isConnected = gcReady();
+  var lastSyncStr = GC.lastSync
+    ? GC.lastSync.toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+    : 'Never';
+
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr">'+
+      '<div>'+
+        '<div class="sht-ttl">📱 Google Contacts Sync</div>'+
+        '<div class="sht-sub">Auto-import from alexdoguluer@gmail.com</div>'+
+      '</div>'+
+      '<button class="sht-x" onclick="cls()">✕</button>'+
+    '</div>'+
+    '<div class="sht-bd">'+
+
+      // Status card
+      '<div style="background:'+(isConnected?'var(--gnbg)':'var(--gdbg)')+';border:1.5px solid '+(isConnected?'var(--green)':'var(--gold)')+';border-radius:14px;padding:14px;margin-bottom:14px">'+
+        '<div style="font-size:13px;font-weight:700;color:'+(isConnected?'var(--green)':'var(--gold)')+'">'+
+          (isConnected ? '✅ Connected to Google' : '⚡ Setup Required')+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+
+          (isConnected ? 'Last sync: '+lastSyncStr : 'Connect your Google account to auto-import contacts')+
+        '</div>'+
+      '</div>'+
+
+      // How it works
+      (!isConnected ?
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">'+
+          '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">How it works</div>'+
+          '<div style="font-size:12px;color:var(--muted);line-height:1.8">'+
+            '1. You enter your Google OAuth Client ID below<br>'+
+            '2. Tap <strong>Connect Google</strong> — Google sign-in opens<br>'+
+            '3. Approve access to your Google Contacts<br>'+
+            '4. All contacts sync instantly into the app<br>'+
+            '5. New contacts added on your phone sync automatically'+
+          '</div>'+
+        '</div>'+
+        '<div style="background:var(--blbg);border:1px solid rgba(59,130,246,.2);border-radius:14px;padding:12px;margin-bottom:14px">'+
+          '<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px">⚙️ Need a Client ID? (2 minutes)</div>'+
+          '<div style="font-size:11px;color:var(--muted);line-height:1.7">'+
+            '1. Go to <strong>console.cloud.google.com</strong><br>'+
+            '2. New Project → name it <strong>luxe-sync</strong><br>'+
+            '3. APIs & Services → Enable <strong>People API</strong><br>'+
+            '4. Credentials → Create OAuth 2.0 Client ID<br>'+
+            '5. Application type: <strong>Web application</strong><br>'+
+            '6. Authorised origins: <strong>https://dmks100s.github.io</strong><br>'+
+            '7. Copy the Client ID and paste below'+
+          '</div>'+
+        '</div>'
+      : '') +
+
+      // Client ID input (always show so they can update)
+      '<div class="fg">'+
+        '<div class="fl">Google OAuth Client ID</div>'+
+        '<input class="fi" id="gc_cid" placeholder="xxxxxxxxxx.apps.googleusercontent.com" value="'+esc(GC.clientId)+'" style="font-size:12px;font-family:monospace">'+
+      '</div>'+
+
+      // Sync options (only when connected)
+      (isConnected ?
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">'+
+          '<div class="fg" style="margin-bottom:0">'+
+            '<div class="fl">Auto-sync</div>'+
+            '<select class="fs" id="gc_auto">'+
+              '<option value="0" '+(localStorage.getItem('gc_auto')==='0'?'selected':'')+'>Manual only</option>'+
+              '<option value="3600000" '+(localStorage.getItem('gc_auto')==='3600000'?'selected':'')+'>Every hour</option>'+
+              '<option value="21600000" '+(localStorage.getItem('gc_auto')==='21600000'?'selected':'')+'>Every 6 hours</option>'+
+              '<option value="86400000" '+(localStorage.getItem('gc_auto')==='86400000'?'selected':'')+'>Once a day</option>'+
+            '</select>'+
+          '</div>'+
+        '</div>'
+      : '')+
+
+    '</div>'+
+    '<div class="sht-ft" style="flex-direction:column;gap:8px">'+
+      (isConnected
+        ? '<button class="btn btn-tl btn-fw" style="margin-top:0" onclick="gcSaveSettings();gcSyncNow()">🔄 Sync Now</button>'+
+          '<button class="btn btn-gd btn-fw" style="margin-top:0" onclick="gcSaveSettings();cls();toast(\'Settings saved\')">Save Settings</button>'+
+          '<button class="btn btn-gh btn-fw" style="margin-top:0;color:var(--red)" onclick="gcDisconnect()">Disconnect Google</button>'
+        : '<button class="btn btn-fw" style="background:linear-gradient(135deg,#4285F4,#1A73E8);color:#fff;margin-top:0" onclick="gcConnect()">🔗 Connect Google Account</button>'
+      )+
+      '<button class="btn btn-gh btn-fw" style="margin-top:0" onclick="cls()">Close</button>'+
+    '</div>'+
+  '</div>');
+}
+
+// ── Save settings ──
+function gcSaveSettings(){
+  var cid = ($('gc_cid')||{value:''}).value.trim();
+  var auto = ($('gc_auto')||{value:'0'}).value;
+  if(cid) { GC.clientId = cid; localStorage.setItem('gc_client_id', cid); }
+  localStorage.setItem('gc_auto', auto);
+  gcSetAutoSync(parseInt(auto));
+}
+
+// ── Connect via Google OAuth ──
+function gcConnect(){
+  var cid = ($('gc_cid')||{value:''}).value.trim() || GC.clientId;
+  if(!cid){ toast('Enter your Google Client ID first'); return; }
+  GC.clientId = cid;
+  localStorage.setItem('gc_client_id', cid);
+
+  // Build OAuth URL
+  var params = new URLSearchParams({
+    client_id: cid,
+    redirect_uri: window.location.origin + window.location.pathname,
+    response_type: 'token',
+    scope: 'https://www.googleapis.com/auth/contacts.readonly',
+    include_granted_scopes: 'true',
+    state: 'gc_oauth',
+    prompt: 'select_account'
+  });
+
+  // Open OAuth in popup
+  var w = window.open('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString(),
+    'gcauth', 'width=500,height=600,scrollbars=yes');
+
+  // Poll for token in URL hash
+  var poll = setInterval(function(){
+    try {
+      if(!w || w.closed){
+        clearInterval(poll);
+        return;
+      }
+      var hash = w.location.hash;
+      if(hash && hash.includes('access_token')){
+        clearInterval(poll);
+        w.close();
+        var tokenParams = new URLSearchParams(hash.substring(1));
+        var token = tokenParams.get('access_token');
+        var expiresIn = parseInt(tokenParams.get('expires_in') || '3600');
+        if(token){
+          GC.accessToken = token;
+          GC.tokenExpiry = Date.now() + (expiresIn * 1000);
+          localStorage.setItem('gc_token', token);
+          localStorage.setItem('gc_token_expiry', GC.tokenExpiry.toString());
+          cls();
+          toast('✅ Google connected — syncing contacts…');
+          setTimeout(gcSyncNow, 500);
+        }
+      }
+    } catch(e){ /* cross-origin - keep polling */ }
+  }, 500);
+
+  // Timeout after 3 minutes
+  setTimeout(function(){ clearInterval(poll); if(w&&!w.closed)w.close(); }, 180000);
+}
+
+// ── Sync contacts from Google People API ──
+async function gcSyncNow(){
+  if(!gcReady()){
+    toast('Google not connected — tap Google Contacts to connect');
+    return;
+  }
+  toast('📱 Fetching Google Contacts…');
+  try {
+    var added = 0, updated = 0, total = 0;
+    var nextPage = null;
+
+    do {
+      var url = 'https://people.googleapis.com/v1/people/me/connections' +
+        '?personFields=names,phoneNumbers,emailAddresses,addresses,organizations' +
+        '&pageSize=200&sortOrder=LAST_MODIFIED_DESCENDING' +
+        (nextPage ? '&pageToken=' + nextPage : '');
+
+      var res = await fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + GC.accessToken }
+      });
+
+      if(res.status === 401){
+        // Token expired
+        GC.accessToken = '';
+        localStorage.removeItem('gc_token');
+        toast('Google session expired — please reconnect');
+        return;
+      }
+
+      if(!res.ok){ toast('Google sync error: ' + res.status); return; }
+
+      var data = await res.json();
+      var connections = data.connections || [];
+      total += connections.length;
+      nextPage = data.nextPageToken || null;
+
+      // Process each contact
+      connections.forEach(function(person){
+        var name = '';
+        if(person.names && person.names[0]){
+          name = person.names[0].displayName || '';
+        }
+        if(!name) return; // Skip nameless contacts
+
+        var phones = (person.phoneNumbers || []).map(function(p){ return fmtPh(p.value); }).filter(Boolean);
+        var emails = (person.emailAddresses || []).map(function(e){ return e.value; }).filter(Boolean);
+        var addresses = (person.addresses || []).map(function(a){ return a.formattedValue; }).filter(Boolean);
+        var org = person.organizations && person.organizations[0] ? person.organizations[0].name : '';
+
+        var phone = phones[0] || '';
+        var email = emails[0] || '';
+        var address = addresses[0] || '';
+
+        // Check if contact already exists by phone or name
+        var existing = gC().find(function(c){
+          return (phone && c.phone === phone) ||
+                 (c.name && c.name.toLowerCase() === name.toLowerCase());
+        });
+
+        if(existing){
+          // Update if phone/email changed
+          var changed = false;
+          if(phone && existing.phone !== phone){ existing.phone = phone; changed = true; }
+          if(email && existing.email !== email){ existing.email = email; changed = true; }
+          if(address && !existing.address){ existing.address = address; changed = true; }
+          if(changed){ updated++; }
+        } else {
+          // Add new contact
+          var newC = {
+            id: 'gc' + Date.now() + Math.random().toString(36).slice(2,6),
+            name: name,
+            phone: phone,
+            email: email,
+            address: address,
+            notes: org ? 'Google Contacts' + (org ? ' · ' + org : '') : 'Google Contacts',
+            source: 'google',
+            googleResourceName: person.resourceName || ''
+          };
+          gC().push(newC);
+          added++;
+
+          // Also create property if address looks like a house
+          if(address && address.match(/\d/)){
+            var existProp = gP().find(function(p){
+              return p.a && p.a.toUpperCase().trim() === address.toUpperCase().trim();
+            });
+            if(!existProp){
+              var street = address.split(',')[0].replace(/^\d+\s+/, '').trim().toUpperCase();
+              gP().push({
+                id: Date.now() + Math.floor(Math.random()*10000),
+                a: address.toUpperCase(),
+                s: street,
+                n: name,
+                p: phone,
+                e: email,
+                no: 'Imported from Google Contacts',
+                status: 'uncontacted',
+                sb: 'Melbourne',
+                po: '',
+                vtype: '',
+                source: 'google'
+              });
+            }
+          }
+        }
+      });
+
+    } while(nextPage);
+
+    // Save everything
+    sC();
+    if(added > 0) sP();
+
+    GC.lastSync = new Date();
+    localStorage.setItem('gc_last_sync', GC.lastSync.toISOString());
+
+    // Refresh UI if on contacts page
+    if(S.pg === 'contacts') rContacts();
+
+    toast('✅ Synced: +' + added + ' new · ' + updated + ' updated · ' + total + ' total');
+    sbUpdateUI();
+
+    // Set auto-sync if configured
+    var autoMs = parseInt(localStorage.getItem('gc_auto') || '0');
+    if(autoMs > 0) gcSetAutoSync(autoMs);
+
+  } catch(e){
+    console.error('gcSyncNow error:', e);
+    toast('Sync error — check connection');
+  }
+}
+
+// ── Auto-sync timer ──
+function gcSetAutoSync(ms){
+  if(GC.autoSyncTimer){ clearInterval(GC.autoSyncTimer); GC.autoSyncTimer = null; }
+  if(ms > 0 && gcReady()){
+    GC.autoSyncTimer = setInterval(gcSyncNow, ms);
+  }
+}
+
+// ── Disconnect ──
+function gcDisconnect(){
+  GC.accessToken = '';
+  GC.tokenExpiry = 0;
+  GC.clientId = '';
+  GC.lastSync = null;
+  ['gc_token','gc_token_expiry','gc_client_id','gc_last_sync','gc_auto'].forEach(function(k){
+    localStorage.removeItem(k);
+  });
+  if(GC.autoSyncTimer){ clearInterval(GC.autoSyncTimer); }
+  cls();
+  toast('Google Contacts disconnected');
+}
+
+// ── Handle OAuth redirect (for non-popup flow) ──
+(function(){
+  // Check if we're returning from OAuth redirect
+  var hash = window.location.hash;
+  if(hash && hash.includes('access_token') && hash.includes('state=gc_oauth')){
+    var params = new URLSearchParams(hash.substring(1));
+    var token = params.get('access_token');
+    var expiresIn = parseInt(params.get('expires_in') || '3600');
+    if(token){
+      GC.accessToken = token;
+      GC.tokenExpiry = Date.now() + (expiresIn * 1000);
+      localStorage.setItem('gc_token', token);
+      localStorage.setItem('gc_token_expiry', GC.tokenExpiry.toString());
+      // Clean URL
+      history.replaceState(null, '', window.location.pathname);
+      setTimeout(function(){
+        toast('✅ Google connected — syncing…');
+        gcSyncNow();
+      }, 1000);
+    }
+  }
+  // Start auto-sync if configured and token valid
+  var autoMs = parseInt(localStorage.getItem('gc_auto') || '0');
+  if(autoMs > 0 && gcReady()){
+    gcSetAutoSync(autoMs);
+  }
+})();
+
+/* ══ END GOOGLE CONTACTS SYNC ENGINE ══ */
 
 /* ── ADD MENUS ── */
 function addMenu(){modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">Add New</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd" style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-gd btn-fw" onclick="cls();addPropM()">🏠 New Property</button><button class="btn btn-bl btn-fw" onclick="cls();addContM()">👤 New Contact</button><button class="btn btn-gh btn-fw" onclick="cls();appraisalM()">📅 New Appraisal</button><button class="btn btn-gh btn-fw" onclick="cls();addTodoM()">✅ New Task</button></div><div style="height:10px"></div></div>');}
