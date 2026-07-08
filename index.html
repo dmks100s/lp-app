@@ -2033,7 +2033,7 @@ function showApptSMS(aid){
   templates.forEach(function(t,i){
     html+='<div class="tc'+(i===0?' on':'')+'" onclick="apptPickTIdx('+i+')" style="touch-action:manipulation">';
     html+='<div class="tr">'+(i===0?'<span style="color:#000;font-size:10px;font-weight:900">✓</span>':'')+'</div>';
-    html+='<div style="flex:1;min-width:0"><div class="tc-n">'+t.n+'</div>';
+    html+='<div style="flex:1;min-width:0"><div class="tc-n">'+t.l+'</div>';
     html+='<div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';
   });
   html+='</div>';
@@ -2523,8 +2523,18 @@ function rBulk(){
 '</div>'+
   (!ov?'<div style="padding:10px 14px;border-bottom:1px solid var(--border2);background:var(--card)"><div class="fl">Filter by Street</div><select class="fs" style="font-size:13px" onchange="S.bkStr=this.value;S.bkSel=new Set();window._bkOv=null;rBulk()"><option value="">All Streets ('+awp.length+' contacts)</option>'+sts.map(function(s){return'<option value="'+esc(s)+'"'+(S.bkStr===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>':'<div style="padding:10px 16px;background:var(--gdbg);border-bottom:1px solid var(--gold);font-size:12.5px;color:var(--gold);display:flex;align-items:center;justify-content:space-between">'+pool.length+' contacts from Smart Calls<button style="background:none;border:none;color:var(--gold);font-size:18px;cursor:pointer" onclick="window._bkOv=null;S.bkSel=new Set();rBulk()">✕</button></div>')+
   '<div style="padding:12px 14px;border-bottom:1px solid var(--border2);background:var(--card)"><div class="fl">Template</div>'+
-  TMPLS.map(function(t,i){return'<div class="tc'+(ti===i?' on':'')+'" onclick="window._bkTi='+i+';window._bkMsg=null;rBulk()"><div class="tr">'+(ti===i?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.n+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+
-  '<div style="margin-top:10px"><div class="fl">Message <span id="bklen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="bkmsg" style="min-height:90px" oninput="window._bkMsg=this.value;$$(\'bklen\').textContent=this.value.length+\' chars\'">'+(window._bkMsg||TMPLS[ti].t)+'</textarea><div style="font-size:11.5px;color:var(--dim);margin-top:6px">Variables: [Name] [Address] [Street] [Suburb]</div></div></div>'+
+  TMPLS.map(function(t,i){
+    var isOn=ti===i;
+    return '<div class="tc'+(isOn?' on':'')+'" onclick="pickTpl('+i+')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'+(isOn?'var(--tlbg)':'var(--card)')+';border:1.5px solid '+(isOn?'var(--teal)':'var(--border)')+';border-radius:12px;margin-bottom:7px;cursor:pointer;touch-action:manipulation">'+
+      '<div style="font-size:20px;flex-shrink:0">'+(t.l.split(' ')[0]||'💬')+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:700;color:'+(isOn?'var(--teal)':'var(--text)')+'">'+t.l.replace(/^[^\s]+\s/,'')+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+t.m.substring(0,60)+(t.m.length>60?'…':'')+'</div>'+
+      '</div>'+
+      (isOn?'<div style="width:20px;height:20px;background:var(--teal);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;flex-shrink:0">✓</div>':'')+
+    '</div>';
+  }).join('')+
+  '<div style="margin-top:10px"><div class="fl">Message <span id="bklen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="bkmsg" style="min-height:90px" oninput="window._bkMsg=this.value;$$(\'bklen\').textContent=this.value.length+\' chars\'">'+(window._bkMsg!==null&&window._bkMsg!==undefined?window._bkMsg:(TMPLS[ti]?TMPLS[ti].m:'')).replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea><div style="font-size:11.5px;color:var(--dim);margin-top:6px">Variables: [Name] [Address] [Street] [Suburb]</div></div></div>'+
   '<div style="padding:10px 14px;display:flex;gap:8px;border-bottom:1px solid var(--border2)"><button class="btn btn-gd" style="flex:2" onclick="startBulk()">▶ Send '+(sel.size>0?sel.size:pool.length)+' SMS</button><button class="btn btn-gh" style="flex:1;font-size:13px" onclick="bkSelAll()">'+(sel.size===pool.length&&pool.length>0?'Deselect All':'Select All')+'</button></div>'+
   pool.slice(0,100).map(function(p){return'<div class="bki"><div class="bkc'+(sel.has(p.id)?' on':'')+'" onclick="togBk('+p.id+')">'+(sel.has(p.id)?'✓':'')+'</div><img class="av sm rnd" src="'+avatarUrl(p.n,p.e,60)+'" onerror="this.style.display=\'none\'" loading="lazy"><div style="flex:1;min-width:0"><div class="rt" style="font-size:13.5px">'+(p.n||'Unknown')+'</div><div style="font-size:12px;color:var(--muted);font-family:monospace">'+p.p+'</div></div><span class="bdg '+bc(p.status)+'" style="font-size:10px">'+(p.status||'').replace('_',' ')+'</span></div>';}).join('')+
   '<div style="height:80px"></div>';
@@ -2582,10 +2592,30 @@ function togBkSel(id){if(S.bkSel.has(id))S.bkSel.delete(id);else S.bkSel.add(id)
   if(sndBtn)sndBtn.disabled=S.bkSel.size===0;
 }
 
+function pickTpl(i){
+  window._bkTi=i;
+  window._bkMsg=null;
+  // Update template UI without full rerender
+  document.querySelectorAll('.tc-item').forEach(function(el,idx){
+    var isOn=idx===i;
+    el.style.background=isOn?'var(--tlbg)':'var(--card)';
+    el.style.borderColor=isOn?'var(--teal)':'var(--border)';
+  });
+  // Update message textarea
+  var ta=document.getElementById('bkmsg');
+  if(ta){
+    var t=TMPLS[i];
+    if(t&&t.m){ta.value=t.m;updateBkLen();}
+    else if(t&&!t.m){ta.value='';}
+  }
+  // Full rerender only needed for first pick to populate msg
+  rBulk();
+}
+
 function bkSelAll(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);S.bkSel=S.bkSel.size===pool.length?new Set():new Set(pool.map(function(p){return p.id;}));rBulk();}
 function togBk(id){if(S.bkSel.has(id))S.bkSel.delete(id);else S.bkSel.add(id);var cb=document.querySelector('.bki [onclick="togBk('+id+')"]');if(cb){cb.classList.toggle('on',S.bkSel.has(id));cb.textContent=S.bkSel.has(id)?'✓':'';}var btn=document.querySelector('[onclick="startBulk()"]');if(btn)btn.textContent='▶ Send '+(S.bkSel.size>0?S.bkSel.size:document.querySelectorAll('.bki').length)+' SMS';}
 var _bQ=[],_bI=0,_bMsg='';
-function startBulk(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);var send=S.bkSel.size>0?pool.filter(function(p){return S.bkSel.has(p.id);}):pool;if(!send.length){toast('No contacts to send to');return;}_bMsg=window._bkMsg||TMPLS[window._bkTi||0].t;_bQ=send;_bI=0;nxtBulk();}
+function startBulk(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);var send=S.bkSel.size>0?pool.filter(function(p){return S.bkSel.has(p.id);}):pool;if(!send.length){toast('No contacts to send to');return;}_bMsg=window._bkMsg||TMPLS[window._bkTi||0].m;_bQ=send;_bI=0;nxtBulk();}
 function nxtBulk(){if(_bI>=_bQ.length){toast('✅ All '+_bQ.length+' SMS complete');S.bkSel=new Set();window._bkOv=null;return;}var p=_bQ[_bI];var msg=_bMsg.replace(/\[Name\]/g,(p.n||'there').split(' ')[0]).replace(/\[Address\]/g,p.a||'').replace(/\[Street\]/g,p.s||'').replace(/\[Suburb\]/g,p.sb||'');window.open('sms:'+p.p+'?body='+encodeURIComponent(msg),'_self');gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a,name:p.n,phone:p.p,outcome:'sent',notes:msg.substring(0,80),date:new Date().toISOString()});sI();_bI++;if(_bI<_bQ.length){setTimeout(function(){if(confirm('SMS '+_bI+'/'+_bQ.length+' sent.\n\nNext: '+(_bQ[_bI].n||'?')+' — '+_bQ[_bI].p+'\n\nSend next?'))nxtBulk();else toast('Paused at '+_bI);},1200);}else{setTimeout(function(){toast('✅ All '+_bQ.length+' SMS sent');},700);}}
 
 
@@ -2643,8 +2673,36 @@ function rBuyers(){
   html+='<div style="height:80px"></div>';
   $('scr').innerHTML=html;
   setTimeout(function(){
-    var f=$('bsq');if(f){f.addEventListener('input',function(){S.bq=this.value;rBuyers();});}
     swipes();
+    srchBind('bsq',function(){
+      var q=(S.bq||'').toLowerCase();
+      var ff=q?gB().filter(function(b){
+        return(b.name||'').toLowerCase().includes(q)||(b.phone||'').includes(q)||(b.email||'').toLowerCase().includes(q)||(b.enquiry||'').toLowerCase().includes(q);
+      }):gB();
+      var bl=document.getElementById('buyers-list');if(!bl)return;
+      if(!ff.length){bl.innerHTML='<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No results</div></div>';return;}
+      var rows='';
+      ff.forEach(function(b){
+        var ph=b.phone||'';
+        rows+='<div class="sw" id="bsw'+b.id+'"><div class="sw-acts">';
+        rows+=(ph?'<div class="sa sa-gn" onclick="window.location.href=\'tel:'+ph+'\'" style="touch-action:manipulation"><span>📞</span>Call</div>':'');
+        rows+=(ph?'<div class="sa sa-bl" onclick="buyerSMS('+b.id+')" style="touch-action:manipulation"><span>💬</span>SMS</div>':'');
+        rows+='<div class="sa sa-gr" onclick="editBuyerM('+b.id+')" style="touch-action:manipulation"><span>✏️</span>Edit</div>';
+        rows+='<div class="sa sa-rd" onclick="delBuyer('+b.id+')" style="touch-action:manipulation"><span>🗑️</span>Del</div>';
+        rows+='</div><div class="row" id="br'+b.id+'">';
+        rows+='<div class="av rnd '+avc(b.name)+'">'+ini(b.name)+'</div>';
+        rows+='<div style="flex:1;min-width:0;cursor:pointer" onclick="editBuyerM('+b.id+')">';
+        rows+='<div class="rt">'+(b.name||'Unknown')+'</div>';
+        rows+='<div class="rs">'+(ph||'No phone')+(b.enquiry?' · <span style="color:var(--teal);font-size:10px">'+esc(b.enquiry)+'</span>':'')+'</div>';
+        rows+=(b.budget?'<div style="font-size:10px;color:var(--gold);font-weight:700;margin-top:2px">💰 '+esc(b.budget)+'</div>':'');
+        rows+='</div>';
+        rows+=(ph?'<a href="tel:'+ph+'" class="ibt gn" onclick="event.stopPropagation()" style="text-decoration:none;display:flex;align-items:center;justify-content:center;touch-action:manipulation">📞</a>':'');
+        rows+=(ph?'<button class="ibt tl" onclick="event.stopPropagation();buyerSMS('+b.id+')" style="touch-action:manipulation">💬</button>':'');
+        rows+='</div></div>';
+      });
+      bl.innerHTML=rows;
+      setTimeout(swipes,50);
+    },function(v){S.bq=v;});
   },80);
 }
 
@@ -3363,7 +3421,7 @@ function saveCall(ph,nm,ad,pid){var realPh=fmtPh(($('call-ph')&&$('call-ph').val
   bdg();if(['voicemail','connected','interested','callback'].includes(oc)&&realPh)setTimeout(function(){if(confirm('Send SMS follow-up?'))smsM(realPh,nm,ad,pid);},250);}
 
 /* ── SMS ── */
-function smsM(ph,nm,ad,pid){var fn=(nm||'').split(' ')[0]||'there';var ts=TMPLS.map(function(t){return Object.assign({},t,{t:t.t.replace(/\[Name\]/g,fn).replace(/\[Address\]/g,ad||'').replace(/\[Street\]/g,'').replace(/\[Suburb\]/g,'')});});modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">💬 SMS</div><div class="sht-sub">'+(nm||'Owner')+' · '+(ph||'No phone')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Template</div>'+ts.map(function(t,i){return'<div class="tc'+(i===0?' on':'')+'" id="st'+i+'" onclick="pickT('+i+')"><div class="tr">'+(i===0?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.n+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+'</div><div class="fg"><div class="fl">Message <span id="slen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="smst" style="min-height:120px" oninput="window._sm=this.value;$$(\'slen\').textContent=this.value.length+\' chars\'">'+(ts[0].t)+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+(ph?'<a class="btn btn-gd" id="smsl" href="sms:'+ph+'?body='+encodeURIComponent(ts[0].t)+'" onclick="logSMS(\''+esc(ph)+'\',\''+esc(nm)+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Messages →</a>':'<button class="btn btn-gd" disabled style="opacity:.35">No phone</button>')+'</div></div>');window._smTs=ts;window._smPh=ph;$('slen').textContent=ts[0].t.length+' chars';}
+function smsM(ph,nm,ad,pid){var fn=(nm||'').split(' ')[0]||'there';var ts=TMPLS.map(function(t){return Object.assign({},t,{t:t.t.replace(/\[Name\]/g,fn).replace(/\[Address\]/g,ad||'').replace(/\[Street\]/g,'').replace(/\[Suburb\]/g,'')});});modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">💬 SMS</div><div class="sht-sub">'+(nm||'Owner')+' · '+(ph||'No phone')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Template</div>'+ts.map(function(t,i){return'<div class="tc'+(i===0?' on':'')+'" id="st'+i+'" onclick="pickT('+i+')"><div class="tr">'+(i===0?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.l+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+'</div><div class="fg"><div class="fl">Message <span id="slen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="smst" style="min-height:120px" oninput="window._sm=this.value;$$(\'slen\').textContent=this.value.length+\' chars\'">'+(ts[0].t)+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+(ph?'<a class="btn btn-gd" id="smsl" href="sms:'+ph+'?body='+encodeURIComponent(ts[0].t)+'" onclick="logSMS(\''+esc(ph)+'\',\''+esc(nm)+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Messages →</a>':'<button class="btn btn-gd" disabled style="opacity:.35">No phone</button>')+'</div></div>');window._smTs=ts;window._smPh=ph;$('slen').textContent=ts[0].t.length+' chars';}
 window.pickT=function(i){document.querySelectorAll('.tc').forEach(function(e,j){e.classList.toggle('on',j===i);e.querySelector('.tr').innerHTML=j===i?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'';});var t=$('smst');if(t){t.value=window._smTs[i].t;t.dispatchEvent(new Event('input'));}var l=$('smsl');if(l)l.href='sms:'+window._smPh+'?body='+encodeURIComponent(window._smTs[i].t);};
 function logSMS(ph,nm,ad,pid){var t=($('smst')||{}).value||'';gI().push({id:Date.now(),type:'sms',propertyId:pid,address:ad,name:nm,phone:ph,outcome:'sent',notes:t.substring(0,120),date:new Date().toISOString()});sI();cls();toast('SMS opened');bdg();}
 
