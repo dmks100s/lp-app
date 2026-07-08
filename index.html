@@ -337,6 +337,59 @@ input[type=date],input[type=time]{color-scheme:light dark;}
 .stat-grid .sc:nth-child(4){animation:scaleIn .3s ease .16s both;}
 .qa-chip{animation:fadeUp .3s ease .08s both;}
 .home-greeting{font-size:12px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1.5px;}
+
+/* ── ADDITIONAL VISUAL ENHANCEMENTS v45 ── */
+
+/* Gradient stat numbers */
+.sc.tl .sc-n{background:linear-gradient(135deg,var(--teal),var(--teal2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.gd .sc-n{background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.gn .sc-n{background:linear-gradient(135deg,var(--green),#047857);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.rd .sc-n{background:linear-gradient(135deg,var(--red),#B91C1C);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.bl .sc-n{background:linear-gradient(135deg,var(--blue),#1D4ED8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.pu .sc-n{background:linear-gradient(135deg,var(--purple),#6D28D9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc.am .sc-n{background:linear-gradient(135deg,var(--amber),#B45309);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sc-emoji{font-size:18px;margin-bottom:4px;display:block;}
+
+/* Template cards */
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tpl-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;touch-action:manipulation;transition:all .15s;}
+.tpl-card.on{border-color:var(--teal);background:var(--tlbg);}
+.tpl-card:active{transform:scale(.97);}
+.tpl-icon{font-size:18px;margin-bottom:4px;}
+.tpl-label{font-size:11px;font-weight:700;color:var(--text);line-height:1.2;}
+
+/* Hot list gold glow row */
+.hot-glow-row{border-left:3px solid var(--gold) !important;background:linear-gradient(to right,rgba(201,169,110,.06),var(--card)) !important;}
+
+/* Pulse animation for upcoming appraisals */
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+.dot-pulse{animation:pulse-dot 2s ease-in-out infinite;}
+
+/* Smart call priority bar */
+.sc-priority-bar{width:3px;height:100%;border-radius:2px;position:absolute;left:0;top:0;}
+.sc-priority-bar.hot{background:var(--red);}
+.sc-priority-bar.warm{background:var(--gold);}
+.sc-priority-bar.cool{background:var(--teal);}
+
+/* Buyer card */
+.buyer-enquiry-tag{display:inline-flex;align-items:center;padding:2px 7px;background:var(--tlbg);color:var(--teal);border-radius:6px;font-size:9px;font-weight:800;margin-top:3px;}
+
+/* Section with coloured accent */
+.sec-accent-teal::before{content:'';display:inline-block;width:3px;height:14px;background:var(--teal);border-radius:2px;margin-right:8px;vertical-align:middle;}
+.sec-accent-gold::before{content:'';display:inline-block;width:3px;height:14px;background:var(--gold);border-radius:2px;margin-right:8px;vertical-align:middle;}
+.sec-accent-red::before{content:'';display:inline-block;width:3px;height:14px;background:var(--red);border-radius:2px;margin-right:8px;vertical-align:middle;}
+
+/* Appraisal upcoming card glow */
+.appt-card.upcoming{box-shadow:0 0 0 1px rgba(239,68,68,.2),0 4px 16px rgba(239,68,68,.1);}
+
+/* Home callbar progress */
+.home-prog{height:3px;background:rgba(255,255,255,.12);border-radius:2px;margin-top:6px;overflow:hidden;}
+.home-prog-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:2px;transition:width .8s ease;}
+
+/* Contacts AZ filter banner */
+.az-filter-banner{padding:8px 14px;background:var(--tlbg);border-bottom:1px solid rgba(0,180,174,.2);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.az-filter-banner-t{font-size:11px;font-weight:800;color:var(--teal);}
+
 </style>
 </head>
 <body class="light">
@@ -1076,6 +1129,8 @@ function smRow(p,isA){
   return '<div class="sw" id="sws'+p.id+'">'+
     '<div class="sw-acts">'+
       '<div class="sa sa-gn" onclick="callM(\''+esc(p.p)+'\',\''+esc(p.n)+'\',\''+esc(p.a)+'\','+p.id+')"><span>📞</span>Call</div>'+
+      '<div class="sa sa-bl" onclick="S.smSel=new Set(['+p.id+']);smBulkSMS()"><span>💬</span>SMS</div>'+
+      '<div class="sa sa-gd" onclick="togHot('+p.id+');rSmart()"><span>🔥</span>Hot</div>'+
       '<div class="sa sa-gr" onclick="archSm('+p.id+')"><span>'+(isA?'↩️':'📦')+'</span>'+(isA?'Restore':'Archive')+'</div>'+
     '</div>'+
     '<div class="row" id="swr'+p.id+'">'+
@@ -2439,7 +2494,20 @@ function logSendSMS(id){
 }
 
 /* ── BULK SMS ── */
-var TMPLS=[{n:'Market Update',t:"Hi [Name], it's Alex from Luxe Properties Melbourne. Properties in your area have been performing really well. If you've been thinking about selling, I'd love to chat about what your home could achieve. – Alex 📱"},{n:'Just Sold Nearby',t:"Hi [Name], Alex from Luxe Properties here. I just sold a property on your street for a fantastic result! Buyer demand is very high right now. I'd love to share what your home could achieve – can we have a quick call? – Alex"},{n:'Just Listed Nearby',t:"Hi [Name], it's Alex from Luxe Properties Melbourne. A property near you just hit the market and we're seeing great buyer interest. Now is a great time to discuss your home's value. – Alex"},{n:'Free Appraisal',t:"Hi [Name], Alex from Luxe Properties Melbourne. I'd love to offer you a free, no-obligation market appraisal. Our recent results in your area have been outstanding. Would you be open to a quick visit? – Alex"},{n:'Introduction',t:"Hi [Name], my name is Alex Doguluer from Luxe Properties Melbourne. I work with homeowners in your area and wanted to introduce myself. If you'd like to know your home's value, I'm always happy to help. – Alex"},{n:'Re-engagement',t:"Hi [Name], Alex from Luxe Properties here. It's been a while – hope all is well! The market in your area has shifted and I'd love to share an updated appraisal when you have a moment. – Alex"},{n:'Auction Result',t:"Hi [Name], Alex from Luxe Properties here. We just had a fantastic auction result near you! Buyer competition is strong right now. Would you like to know what your home could achieve? – Alex"},{n:'Post Appraisal',t:"Hi [Name], it's Alex Doguluer from Luxe Properties Melbourne. Thank you so much for your time today – it was a pleasure visiting your home at [Address]. I'm confident we can achieve a great result for you. When you're ready to give us the green light, I'm here to make it happen. – Alex 📱"},{n:'Custom',t:"Hi [Name], "}];
+var TMPLS=[
+    {l:'📊 Market Update',m:'Hi [Name], Alex from Luxe Properties Melbourne. Quick market update — buyer demand in your area is strong and properties are achieving excellent results right now. Would you be open to a quick confidential chat? — Alex 0434 342 390'},
+    {l:'🔨 Just Sold Nearby',m:'Hi [Name], exciting news — we just sold a property close to yours at an outstanding result! Strong buyer demand is flowing through your area right now. Would you like to know what your property could achieve? — Alex, Luxe Properties 0434 342 390'},
+    {l:'🏠 Just Listed Nearby',m:'Hi [Name], Alex from Luxe Properties. We just listed a property close to yours and it\'s attracting serious buyer interest. If you\'ve been thinking of selling, now could be the perfect time to discuss. Happy to chat anytime — Alex 0434 342 390'},
+    {l:'🎯 Free Appraisal',m:'Hi [Name], Alex from Luxe Properties Melbourne. I\'d love to offer you a complimentary property appraisal — absolutely no obligation. Many owners in your area are pleasantly surprised by current values. Can I pop by at a time that suits? — Alex 0434 342 390'},
+    {l:'👋 Introduction',m:'Hi [Name], I\'m Alex from Luxe Properties Melbourne — your local boutique agent specialising in premium results. I pride myself on honest communication and outstanding marketing. Would love to connect whenever you\'re thinking of selling. — Alex 0434 342 390'},
+    {l:'🔄 Re-engagement',m:'Hi [Name], Alex from Luxe Properties here. Hope you\'re well! The market in your area has shifted significantly and I\'d love to share some recent results with you. Are you free for a quick chat? — Alex 0434 342 390'},
+    {l:'🏆 Auction Result',m:'Hi [Name], Alex from Luxe Properties. We just achieved a fantastic auction result in your street — sold well above reserve with multiple bidders competing! This level of buyer demand doesn\'t last long. Would you like to know what your property is worth right now? — Alex 0434 342 390'},
+    {l:'✅ Post Appraisal',m:'Hi [Name], thank you so much for welcoming me to your beautiful home today. It was a genuine pleasure to meet you. I\'m confident we can achieve an outstanding result for you. Whenever you\'re ready to take the next step, I\'m here to make the process seamless. — Alex 0434 342 390'},
+    {l:'📅 Open Home Follow-up',m:'Hi [Name], Alex from Luxe Properties. Thank you for attending our open home today — it was wonderful to meet you! I\'d love to answer any questions and keep you updated on this property and similar ones. Please feel free to reach out anytime. — Alex 0434 342 390'},
+    {l:'💰 Price Adjustment',m:'Hi [Name], Alex from Luxe Properties. Quick update — the vendor on a property that may interest you has adjusted the asking price. This could be a real opportunity. Would you like me to arrange a private viewing this week? — Alex 0434 342 390'},
+    {l:'🏡 Off-Market Opportunity',m:'Hi [Name], Alex from Luxe Properties here. I have an exciting off-market property coming up that might be perfect for you — before it hits the public portals. Would you like to hear more details? Let\'s talk! — Alex 0434 342 390'},
+    {l:'✏️ Custom Message',m:''}
+  ];
 
 function rBulk(){
   var ov=window._bkOv;var awp=gP().filter(function(p){return!p.archived&&p.p;});var sts=[...new Set(awp.map(function(p){return p.s;}))].sort();
@@ -2538,7 +2606,7 @@ function rBuyers(){
     return (b.name||'').toLowerCase().includes(q)||(b.phone||'').includes(q)||(b.email||'').toLowerCase().includes(q)||(b.enquiry||'').toLowerCase().includes(q);
   }):buyers;
   var html='<div style="padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center">';
-  html+='<div style="flex:1;position:relative"><input class="fi" id="bsq" placeholder="Search buyers by name, phone, email..." value="'+esc(S.bq||'')+'" oninput="S.bq=this.value;rBuyers()" style="margin:0;font-size:16px;padding-right:32px"><button style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;touch-action:manipulation" onclick="S.bq=\'\';document.getElementById(\'bsq\').value=\'\';rBuyers()">✕</button></div>';
+  html+='<div style="flex:1;position:relative"><input class="fi" id="bsq" placeholder="Search buyers by name, phone, email..." value="'+esc(S.bq||'')+'" autocomplete="off" autocorrect="off" spellcheck="false" style="margin:0;font-size:16px;padding-right:32px"><button style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;touch-action:manipulation" onclick="S.bq=\'\';document.getElementById(\'bsq\').value=\'\';rBuyers()">✕</button></div>';
   html+='<button class="btn btn-gd" style="padding:8px 12px;font-size:13px;white-space:nowrap;touch-action:manipulation" onclick="addBuyerM()">+ Add</button>';
   html+='</div>';
   if(buyers.length===0){
@@ -2547,7 +2615,8 @@ function rBuyers(){
     html+='<div class="empty"><div class="empty-i">🔍</div><div class="empty-t">No results</div></div>';
   } else {
     html+='<div class="sticky-hdr">BUYERS — '+filtered.length+'</div>';
-    html+=filtered.map(function(b){
+    html+='<div id="buyers-list">';
+  html+=filtered.map(function(b){
       return '<div class="sw" id="bsw'+b.id+'">' +
         '<div class="sw-acts">' +
           '<div class="sa sa-gn" onclick="if(b_'+b.id+'.p)window.location.href=\'tel:\'+b_'+b.id+'.p"><span>📞</span>Call</div>' +
