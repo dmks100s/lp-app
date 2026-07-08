@@ -2,6 +2,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600&display=swap"></noscript>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600&display=swap');
+/* Fonts loaded via <link> in <head> for non-blocking load */
 
 /* ═══════════════════════════════════════════════════════════
    LUXE PROSPECT v46 — NURTURE CLOUD INSPIRED DESIGN
@@ -687,6 +691,15 @@ input[type=date],input[type=time]{color-scheme:light dark;}
 .qa-chip:active{background:var(--bg3);}
 .qa-chip span{font-size:14px;}
 .section-hdr-sub{font-size:10px;color:var(--muted);padding:4px 14px 0;text-transform:uppercase;letter-spacing:.8px;}
+
+/* PERFORMANCE — content-visibility for offscreen rows */
+#cl .sw, #pl .sw, #scr .sw{content-visibility:auto;contain-intrinsic-size:0 56px;}
+/* Prevent layout recalculation on transform */
+.row,.log-row,.bki,.nc-appt-row{will-change:transform;}
+/* Fast tap response */
+.tab,.btn,.ibt,.qa-chip,.nc-qa-btn,.chip,.bkc,.bki,.row,.row-in,.sw{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+/* Smooth scroll */
+#scr{scroll-behavior:auto;} /* auto is faster than smooth for programmatic */
 </style>
 </head>
 <body class="light">
@@ -829,7 +842,7 @@ function mergeCsvData(){
     localStorage.setItem('lpc',JSON.stringify(cu));
     localStorage.setItem('csv_v1','1');
     _props=null;
-  }catch(e){console.log('merge err',e);}
+  }catch(e){}
 }
 
 /* ── STATE ── */
@@ -840,7 +853,14 @@ var _props=null,_ix=null,_appts=null,_hot=null,_contacts=null,_todos=null;
 
 /* ── DATA ── */
 function gP(){if(!_props){var ov=JSON.parse(localStorage.getItem('lp')||'{}');var cu=JSON.parse(localStorage.getItem('lpc')||'[]');_props=P.map(function(p){var d=ov[p.id];return d?Object.assign({},p,d):Object.assign({},p);});cu.forEach(function(c){if(!_props.find(function(x){return x.id===c.id;}))_props.push(c);});}return _props;}
-function sP(){var ov={},cu=[];gP().forEach(function(p){var o=P.find(function(x){return x.id===p.id;});if(!o){cu.push(p);return;}var d={};['status','no','e','p','n','a','s','isHot','archived','sb','vtype','beds','baths','cars','estval'].forEach(function(k){if(JSON.stringify(p[k])!==JSON.stringify(o[k]))d[k]=p[k];});if(Object.keys(d).length)ov[p.id]=d;});localStorage.setItem('lp',JSON.stringify(ov));localStorage.setItem('lpc',JSON.stringify(cu));}
+function sP(){
+  invAllC();_allCCache=null;
+  // Build index for O(1) lookup instead of O(n) P.find()
+  if(!window._pidx){
+    window._pidx={};
+    P.forEach(function(p){window._pidx[p.id]=p;});
+  }
+  var ov={},cu=[];gP().forEach(function(p){var o=window._pidx?window._pidx[p.id]:P.find(function(x){return x.id===p.id;});if(!o){cu.push(p);return;}var d={};['status','no','e','p','n','a','s','isHot','archived','sb','vtype','beds','baths','cars','estval'].forEach(function(k){if(JSON.stringify(p[k])!==JSON.stringify(o[k]))d[k]=p[k];});if(Object.keys(d).length)ov[p.id]=d;});localStorage.setItem('lp',JSON.stringify(ov));localStorage.setItem('lpc',JSON.stringify(cu));}
 function gI(){if(!_ix)_ix=JSON.parse(localStorage.getItem('li')||'[]');return _ix;}
 function sI(){localStorage.setItem('li',JSON.stringify(gI()));}
 function gA(){if(!_appts){var sv=JSON.parse(localStorage.getItem('la')||'null');_appts=sv||AP.map(function(a){return Object.assign({},a);});}return _appts;}
@@ -848,7 +868,7 @@ function sA(){localStorage.setItem('la',JSON.stringify(gA()));}
 function gH(){if(!_hot){var sv=JSON.parse(localStorage.getItem('lh')||'null');_hot=sv||HL.map(function(h){return Object.assign({},h);});}return _hot;}
 function sH(){localStorage.setItem('lh',JSON.stringify(gH()));}
 function gC(){if(!_contacts)_contacts=JSON.parse(localStorage.getItem('lc')||'[]');return _contacts;}
-function sC(){localStorage.setItem('lc',JSON.stringify(gC()));}
+function sC(){localStorage.setItem('lc',JSON.stringify(gC()));invAllC();}
 function gTodos(){if(!_todos)_todos=JSON.parse(localStorage.getItem('ltd')||'[]');return _todos;}
 function sTodos(){localStorage.setItem('ltd',JSON.stringify(gTodos()));}
 function gSA(){return JSON.parse(localStorage.getItem('sa')||'[]');}
@@ -1070,46 +1090,19 @@ function vsLabel(v){var m={upsizer:'Upsizer',downsizer:'Downsizer',investor:'Inv
 
 /* ── AVATAR ── */
 function avatarUrl(name,email,size){
-  size=size||80;
-  if(email){
-    // Gravatar
-    var e=email.trim().toLowerCase();
-    // We can't compute MD5 in vanilla JS easily - use UI Avatars as fallback
-  }
-  // UI Avatars - free, no key needed
-  var n=encodeURIComponent((name||'?').substring(0,20));
-  return 'https://ui-avatars.com/api/?name='+n+'&size='+size+'&background=D4A843&color=fff&bold=true&rounded=true&font-size=0.4';
-}
-
-/* ── PROPERTY PHOTO ── */
-function propPhotoUrl(addr){
-  if(!addr)return '';
-  var a=encodeURIComponent(addr+', Melbourne VIC, Australia');
-  // OpenStreetMap static map - free, no key
-  // Actually use a house SVG placeholder + address color hash
+  /* REMOVED: was making HTTP requests to ui-avatars.com
+     Now returns empty string — use ini() + avc() CSS instead */
   return '';
 }
-
-/* ── SUBURB DATA (embedded static for Melbourne northern suburbs) ── */
-var SUBURB_DATA={
-  'Greenvale':{med:'$920K',prev:'$880K',growth:'+4.5%',auction:'72%',dom:28,trend:'up',type:'Houses'},
-  'Roxburgh Park':{med:'$680K',prev:'$650K',growth:'+4.6%',auction:'68%',dom:31,trend:'up',type:'Houses'},
-  'Craigieburn':{med:'$650K',prev:'$620K',growth:'+4.8%',auction:'65%',dom:33,trend:'up',type:'Houses'},
-  'Mickleham':{med:'$700K',prev:'$670K',growth:'+4.5%',auction:'70%',dom:29,trend:'up',type:'Houses'},
-  'Sunbury':{med:'$680K',prev:'$640K',growth:'+6.3%',auction:'74%',dom:26,trend:'up',type:'Houses'},
-  'Donnybrook':{med:'$590K',prev:'$560K',growth:'+5.4%',auction:'62%',dom:35,trend:'up',type:'Houses'},
-  'Kalkallo':{med:'$560K',prev:'$530K',growth:'+5.7%',auction:'60%',dom:38,trend:'up',type:'Houses'},
-  'Melbourne':{med:'$780K',prev:'$750K',growth:'+4.0%',auction:'70%',dom:30,trend:'up',type:'Houses'}
-};
-
-/* ── THEME ── */
-function applyTheme(){document.body.className=S.theme;}
 function toggleTheme(){S.theme=S.theme==='light'?'dark':'light';localStorage.setItem('th',S.theme);applyTheme();rTB();}
 applyTheme();
 
 /* ── NAV ── */
 function go(pg,skipPrev){
   removeAZIndex();
+  // Fast: scroll to top immediately
+  var scr=document.getElementById('scr');
+  if(scr) scr.scrollTop=0;
   if(!skipPrev)S.prev=S.pg;
   S.pg=pg;
   ['home','smart','props','contacts','appt','todo','search','log'].forEach(function(t){var e=$('t-'+t);if(e)e.classList.toggle('on',t===pg);});
@@ -1438,7 +1431,7 @@ function generatePriorityCalls(street) {
 }
 
 function renderSaleAlerts(){
-  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]').filter(function(a){return !a.archived;});
+  var alts=gSaAlts().filter(function(a){return !a.archived;});
   if(!alts.length) return '<div class="sale-alert-empty"><span>No area activity logged</span><button onclick="addSaleM()">+ Add sale/listing</button></div>';
   return '<div class="sale-alerts">'+
     '<div class="sale-alert-hdr">🏡 Recent Area Activity <button onclick="addSaleM()">+ Add</button></div>'+
@@ -1468,9 +1461,9 @@ function renderSaleAlerts(){
 }
 
 function archAlt(idx){
-  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var alts=gSaAlts();
   if(alts[idx])alts[idx].archived=true;
-  localStorage.setItem('sa_alts',JSON.stringify(alts));
+  sSaAlts(alts);
   rSmart();
 }
 
@@ -1515,7 +1508,6 @@ function smRow(p,isA){
   var vtag=p.vtype?'<span class="vt '+vsClass(p.vtype)+'">'+vsLabel(p.vtype)+'</span>':'';
   var lx=gI().filter(function(i){return i.propertyId===p.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0];
   var chk=S.smSel.has(p.id);
-  var avUrl=avatarUrl(p.n,p.e,80);
   return '<div class="sw" id="sws'+p.id+'">'+
     '<div class="sw-acts">'+
       '<div class="sa sa-gn" onclick="callM(\''+esc(p.p)+'\',\''+esc(p.n)+'\',\''+esc(p.a)+'\','+p.id+')"><span>📞</span>Call</div>'+
@@ -1604,10 +1596,10 @@ function saveSaleAlert(){
     var ec=gC().find(function(c){return c.phone&&c.phone===ownerPhone;});
     if(!ec&&ownerName){gC().push({id:'c'+Date.now(),name:ownerName,phone:ownerPhone,email:'',address:a,notes:'From area activity — '+(t==='sold'?'Sold':'Listed')});sC();}
   }
-  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var alts=gSaAlts();
   var nb=gP().filter(function(p){return p.s===s&&!p.archived;}).length;
   alts.unshift({id:'alt'+Date.now(),type:t,addr:a,street:s,nb:nb,ownerName:ownerName,ownerPhone:ownerPhone,date:new Date().toISOString(),archived:false});
-  localStorage.setItem('sa_alts',JSON.stringify(alts.slice(0,20)));
+  sSaAlts(alts.slice(0,20));
   addStrSm(s);cls();toast(nb+' owners added to Smart Calls');
 }
 
@@ -1711,7 +1703,6 @@ function pRow(p){
   var hl=gH().filter(function(h){return!h.archived;});var isH=p.isHot||hl.find(function(h){return h.a===p.a;});
   var lx=gI().filter(function(i){return i.propertyId===p.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0];
   var vtag=p.vtype?'<span class="vt '+vsClass(p.vtype)+'">'+vsLabel(p.vtype)+'</span>':'';
-  var avUrl=avatarUrl(p.n,p.e,80);
   return '<div class="sw" id="swp'+p.id+'">'+
     '<div class="sw-acts">'+
       '<div class="sa sa-bl" onclick="editM('+p.id+')"><span>✏️</span>Edit</div>'+
@@ -1766,7 +1757,6 @@ function rPDet(){
   var hl=gH().filter(function(h){return!h.archived;});var isH=p.isHot||hl.find(function(h){return h.a===p.a;});
   var pix=gI().filter(function(i){return i.propertyId===p.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
   var sub=SUBURB_DATA[p.sb]||SUBURB_DATA['Melbourne'];
-  var avUrl=avatarUrl(p.n,p.e,120);
   var tab=S.detTab||'notes';
 
   $('scr').innerHTML=
@@ -2013,7 +2003,17 @@ function addAppraisalReminder(){
 function saveAppraisalReminder(){var addr=($('arat')||{}).value,task=($('artask')||{}).value,due=($('ardue')||{}).value;if(!task){toast('Enter task');return;}var t={id:'t'+Date.now(),title:task,addr:addr,due:due,type:'Appraisal',done:false,created:new Date().toISOString()};gTodos().push(t);sTodos();cls();toast('Reminder added ✓');bdg();if(S.pg==='todo')rTodo();}
 
 /* ── CONTACTS ── */
-function allC(){var m=gC();var fp=gP().filter(function(p){return p.n&&p.p&&!p.archived;}).map(function(p){return{id:'p'+p.id,name:p.n,phone:p.p,email:p.e||'',address:p.a,src:'prop',pid:p.id,status:p.status,vtype:p.vtype||''};});return[...m,...fp].sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});}
+function allC(){
+  if(!_allCCache){
+    var m=gC();
+    var fp=gP().filter(function(p){return p.n&&p.p&&!p.archived;}).map(function(p){
+      return{id:'p'+p.id,name:p.n,phone:p.p,email:p.e||'',address:p.a,src:'prop',pid:p.id,status:p.status,vtype:p.vtype||''};
+    });
+    _allCCache=[...m,...fp].sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
+  }
+  return _allCCache;
+}
+function invAllC(){_allCCache=null;}
 
 function rContacts(){
   var q=(S.cfq||'').toLowerCase().trim();
@@ -2197,7 +2197,6 @@ function cLoadMore(){
 function clrC(){S.cfq='';rContacts();}
 
 function cRow(c){
-  var avUrl=avatarUrl(c.name,c.email,80);
   var vtag=c.vtype?'<span class="vt '+vsClass(c.vtype)+'">'+vsLabel(c.vtype)+'</span>':'';
   return '<div class="sw" id="swc'+c.id+'">'+
     '<div class="sw-acts">'+
@@ -2220,7 +2219,7 @@ function cRow(c){
   '</div>';
 }
 
-function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}var avUrl=avatarUrl(c.name,c.email,120);$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class="det-act-btn bl" onclick="smsM(\''+esc(c.phone||'')+'\',\''+esc(c.name)+'\',\'\',null)">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
+function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class="det-act-btn bl" onclick="smsM(\''+esc(c.phone||'')+'\',\''+esc(c.name)+'\',\'\',null)">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
 function editCM(id){var c=gC().find(function(x){return x.id===id;})||{};modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">✏️ Edit Contact</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Name</div><input class="fi" id="ecn" value="'+esc(c.name||'')+'"></div><div class="fg"><div class="fl">Phone</div><input class="fi" id="ecp" type="tel" value="'+(c.phone||'')+'"></div><div class="fg"><div class="fl">Email</div><input class="fi" id="ece" type="email" value="'+(c.email||'')+'"></div><div class="fg"><div class="fl">Address</div><input class="fi" id="eca" value="'+esc(c.address||'')+'"></div><div class="fg"><div class="fl">Notes</div><textarea class="fta" id="ecno" style="min-height:70px">'+(c.notes||'')+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveCM(\''+id+'\')">Save</button></div></div>');}
 function saveCM(id){var cs=gC();var c=cs.find(function(x){return x.id===id;});if(!c){c={id:id};cs.push(c);}c.name=$('ecn').value;c.phone=fmtPh($('ecp').value);c.email=$('ece').value;c.address=$('eca').value;c.notes=$('ecno').value;sC();cls();toast('Saved ✓');if(S.pg==='cdet')rCDet();else rContacts();}
 function delC(id){_contacts=gC().filter(function(c){return c.id!==id;});sC();toast('Deleted');go('contacts',true);}
@@ -2250,7 +2249,6 @@ function hRow(h,isA){
   // Store hot item data for retrieval by event handlers
   window._hotData=window._hotData||{};
   window._hotData[hid]={p:h.p||h.phone||'',n:h.n||h.name||'',a:h.a||h.address||''};
-  var avUrl=avatarUrl(h.n||h.name,'');
   var open=pid?'oProp('+pid+')':'editHotM('+'\''+hid+'\''+')';
   var html='';
   html+='<div class="sw" id="swh'+hid+'">';
@@ -2696,14 +2694,14 @@ function rSearch(){
     results.map(function(r){
       if(r.type==='prop'){var p=r.p;
         return '<div class="row" style="cursor:pointer" onclick="oProp('+p.id+')">'+
-          '<img class="av" src="'+avatarUrl(p.n,p.e,80)+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" style="border-radius:12px">'+
+          '<div class="av rnd '+avc(p.n||c.name||'')+'">'+ini(p.n||c.name||'?')+'</div>'+
           '<div class="av '+avc(p.n)+'" style="display:none;border-radius:12px">'+ini(p.n)+'</div>'+
           '<div style="flex:1;min-width:0"><div class="rt">'+(p.a||'')+'</div><div class="rs">'+(p.n||'Unknown')+'</div>'+
           '<div class="rm"><span class="bdg '+bc(p.status)+'">'+(p.status||'').replace(/_/g,' ')+'</span><span style="font-size:10px;color:var(--muted)">Property</span></div></div></div>';
       }
       if(r.type==='cont'){var ct=r.c;
         return '<div class="row" style="cursor:pointer" onclick="'+(ct.src==='prop'?'oProp('+ct.pid+')':"oCont('"+ct.id+"')")+'">'+
-          '<img class="av rnd" src="'+avatarUrl(ct.name,ct.email,80)+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy">'+
+          '<div class="av rnd '+avc(p.n||c.name||'')+'">'+ini(p.n||c.name||'?')+'</div>'+
           '<div class="av rnd '+avc(ct.name)+'" style="display:none">'+ini(ct.name)+'</div>'+
           '<div style="flex:1;min-width:0"><div class="rt">'+(ct.name||'Unknown')+'</div><div class="rs">'+(ct.phone||ct.email||'—')+'</div>'+
           '<div class="rm"><span style="font-size:10px;color:var(--muted)">Contact</span></div></div></div>';
@@ -3424,7 +3422,7 @@ function smartRefreshAlerts(){
   });
 
   // Get existing alerts
-  var alts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var alts=gSaAlts();
   var existStreets=alts.map(function(a){return a.street;});
 
   // Generate smart alerts for high-value streets
@@ -3447,7 +3445,7 @@ function smartRefreshAlerts(){
 
   if(newAlerts.length===0){toast('Database already up to date');return;}
   var combined=newAlerts.concat(alts).slice(0,20);
-  localStorage.setItem('sa_alts',JSON.stringify(combined));
+  sSaAlts(combined);
   toast('🔔 '+newAlerts.length+' new prospecting opportunities found');
   if(S.pg==='smart')rSmart();
   else go('smart');
@@ -3844,6 +3842,10 @@ function bkSendNext(){
   }
 }
 
+
+function debounce(fn,ms){var t;return function(){var a=arguments;clearTimeout(t);t=setTimeout(function(){fn.apply(null,a);},ms);};}
+function throttle(fn,ms){var last=0;return function(){var now=Date.now();if(now-last>=ms){last=now;fn.apply(null,arguments);}};}
+
 /* ── ADD MENUS ── */
 function addMenu(){modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">Add New</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd" style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-gd btn-fw" onclick="cls();addPropM()">🏠 New Property</button><button class="btn btn-bl btn-fw" onclick="cls();addContM()">👤 New Contact</button><button class="btn btn-gh btn-fw" onclick="cls();appraisalM()">📅 New Appraisal</button><button class="btn btn-gh btn-fw" onclick="cls();addTodoM()">✅ New Task</button></div><div style="height:10px"></div></div>');}
 function addPropM(){modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">🏠 New Property</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Address</div><input class="fi" id="npa" placeholder="15 Example St, Greenvale VIC 3059"></div><div class="fg"><div class="fl">Street Group</div><input class="fi" id="nps" placeholder="e.g. HILLVIEW RD"></div><div class="fg"><div class="fl">Owner Name</div><input class="fi" id="npn" placeholder="Full name"></div><div class="frow"><div class="fg"><div class="fl">Phone</div><input class="fi" id="npp" type="tel" placeholder="04XX XXX XXX"></div><div class="fg"><div class="fl">Email</div><input class="fi" id="npe" type="email" placeholder="email@..."></div></div><div class="fg"><div class="fl">Vendor Type</div><select class="fs" id="npvt"><option value="">Not set</option><option value="upsizer">Upsizer</option><option value="downsizer">Downsizer</option><option value="investor">Investor</option><option value="seller">Potential Seller</option></select></div><div class="fg"><div class="fl">Status</div><select class="fs" id="npst">'+sopts('uncontacted')+'</select></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveProp()">Add Property</button></div></div>');}
@@ -3957,7 +3959,7 @@ function saveCall(ph,nm,ad,pid){var realPh=fmtPh(($('call-ph')&&$('call-ph').val
   else if(S.pg==='smart')rSmart();
   else if(S.pg==='home')rHome();
   else if(S.pg==='props')rProps();
-  bdg();if(['voicemail','connected','interested','callback'].includes(oc)&&realPh)setTimeout(function(){if(confirm('Send SMS follow-up?'))smsM(realPh,nm,ad,pid);},250);}
+  bdg();if(['voicemail','connected','interested','callback'].includes(oc)&&realPh)setTimeout(function(){if(confirm('Send SMS follow-up?'))smsM(realPh,nm,ad,pid);},150);}
 
 /* ── SMS ── */
 function smsM(ph,nm,ad,pid){var fn=(nm||'').split(' ')[0]||'there';var ts=TMPLS.map(function(t){return Object.assign({},t,{t:t.t.replace(/\[Name\]/g,fn).replace(/\[Address\]/g,ad||'').replace(/\[Street\]/g,'').replace(/\[Suburb\]/g,'')});});modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">💬 SMS</div><div class="sht-sub">'+(nm||'Owner')+' · '+(ph||'No phone')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Template</div>'+ts.map(function(t,i){return'<div class="tc'+(i===0?' on':'')+'" id="st'+i+'" onclick="pickT('+i+')"><div class="tr">'+(i===0?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.l+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+'</div><div class="fg"><div class="fl">Message <span id="slen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="smst" style="min-height:120px" oninput="window._sm=this.value;$$(\'slen\').textContent=this.value.length+\' chars\'">'+(ts[0].t)+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+(ph?'<a class="btn btn-gd" id="smsl" href="sms:'+ph+'?body='+encodeURIComponent(ts[0].t)+'" onclick="logSMS(\''+esc(ph)+'\',\''+esc(nm)+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Messages →</a>':'<button class="btn btn-gd" disabled style="opacity:.35">No phone</button>')+'</div></div>');window._smTs=ts;window._smPh=ph;$('slen').textContent=ts[0].t.length+' chars';}
@@ -4006,95 +4008,62 @@ function bdg(){
 
 /* ── SWIPE ── */
 function swipes(){
-  document.querySelectorAll('.sw').forEach(function(wrap){
-    var row=wrap.querySelector('.row');var acts=wrap.querySelector('.sw-acts');
-    if(!row||!acts||row._sw)return;row._sw=true;
-    acts.style.visibility='visible';
-    var W=Math.max(acts.offsetWidth||0,66*acts.children.length)||210;
-    var sx=0,sy=0,curX=0,moved=false,active=false,isOpen=false;
-    row.addEventListener('touchstart',function(e){sx=e.touches[0].clientX;sy=e.touches[0].clientY;curX=isOpen?-W:0;moved=false;active=true;},{passive:true});
-    row.addEventListener('touchmove',function(e){if(!active)return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(!moved&&Math.abs(dy)>Math.abs(dx)+3){active=false;return;}moved=true;e.preventDefault();var target=(isOpen?-W:0)+dx;curX=Math.max(-W,Math.min(0,target));row.style.transition='none';row.style.transform='translateX('+curX+'px)';},{passive:false});
-    row.addEventListener('touchend',function(){if(!active)return;active=false;row.style.transition='transform .22s ease';if(curX<-W/3){row.style.transform='translateX(-'+W+'px)';isOpen=true;row._open=true;}else{row.style.transform='translateX(0)';isOpen=false;row._open=false;}});
-    row._close=function(){row.style.transition='transform .22s ease';row.style.transform='translateX(0)';isOpen=false;row._open=false;};
-  });
-  document.addEventListener('touchstart',function(e){document.querySelectorAll('.sw').forEach(function(wrap){var r=wrap.querySelector('.row');if(r&&r._open&&!wrap.contains(e.target)&&r._close)r._close();});},{passive:true});
-}
+  // Skip re-init if already delegated
+  var scr=document.getElementById('scr');
+  if(!scr||scr._swDelegated)return;
+  scr._swDelegated=true;
+  var _openSw=null;
 
-/* ── SEARCH ── */
-var _sT=null;
-function srchBind(inputId,onResults,onSet){
-  var inp=$(inputId);
-  if(!inp)return;
-  // iOS fix: ONLY use 'input' event - keydown/keyup/change cause keyboard dismiss
-  // 'compositionend' handles Asian/predictive text input
-  inp.addEventListener('input',function(){
-    var v=this.value;
-    if(onSet)onSet(v);
-    clearTimeout(_sT);
-    _sT=setTimeout(onResults,250);  // 250ms debounce - long enough for iOS
-  });
-  inp.addEventListener('compositionend',function(){
-    var v=this.value;
-    if(onSet)onSet(v);
-    clearTimeout(_sT);
-    _sT=setTimeout(onResults,100);
-  });
-  // Keep focus on iOS when results update
-  inp.addEventListener('blur',function(){
-    // If blur happens during a search debounce, refocus after short delay
-    if(_sT){
-      var self=this;
-      setTimeout(function(){
-        if(document.getElementById(inputId)===self)self.focus();
-      },50);
-    }
-  });
-}
-
-/* ── PRICEFINDER API ── */
-var PF_TOKEN=localStorage.getItem('pf_token')||'';
-var PF_BASE='https://api.pricefinder.com.au/v1';
-var _pfCache={};
-
-function pfSetToken(token){
-  token=(token||'').trim();
-  PF_TOKEN=token;
-  localStorage.setItem('pf_token',token);
-  toast('API key saved ✓ — testing connection…');
-  setTimeout(pfTestConnection,600);
-}
-async function pfTestConnection(){
-  if(!PF_TOKEN){showPFSetup();return;}
-  try{
-    var r=await fetch(PF_BASE+'/suggest/properties?q=15+Hillview+Road+Greenvale',{
-      headers:{'Authorization':'Bearer '+PF_TOKEN,'Accept':'application/json','Origin':location.origin},
-      mode:'cors'
-    });
-    if(r.ok){
-      toast('✅ Pricefinder connected — photos loading!');
-      _pfCache={};_props=null;
-      if(S.pg==='pdet')rPDet();
-    } else if(r.status===403){
-      var body=await r.text();
-      if(body.includes('allowlist')){
-        showPFDomainHelp();
-      } else {
-        toast('❌ Invalid API key — check and re-enter');
-      }
-    } else {
-      toast('API responded: '+r.status);
-    }
-  }catch(e){
-    // CORS block from browser - try via proxy
-    var result=await pfProxyFetch(PF_BASE+'/suggest/properties?q=15+Hillview+Road+Greenvale');
-    if(result&&result.matches){
-      toast('✅ Pricefinder connected via proxy!');
-      _pfCache={};
-      if(S.pg==='pdet')rPDet();
-    } else {
-      showPFDomainHelp();
+  function closeOpen(except){
+    if(_openSw&&_openSw!==except){
+      var r=_openSw.querySelector('.row,.log-row,.bki,.nc-appt-row,.nc-task-row');
+      if(r) r.style.transform='translateX(0)';
+      _openSw=null;
     }
   }
+
+  scr.addEventListener('touchstart',function(e){
+    var wrap=e.target.closest('.sw');
+    if(!wrap)return;
+    var row=wrap.querySelector('.row,.log-row,.bki,.nc-appt-row,.nc-task-row');
+    if(!row||row._swNoSwipe)return;
+    var acts=wrap.querySelector('.sw-acts');
+    if(!acts)return;
+    var t0=e.touches[0];
+    var sx=t0.clientX,sy=t0.clientY,moved=false,dragging=false;
+    var W=acts.offsetWidth||180;
+    var curX=row._swX||0;
+
+    function onMove(e){
+      var t=e.touches[0];
+      var dx=t.clientX-sx,dy=t.clientY-sy;
+      if(!moved){if(Math.abs(dy)>Math.abs(dx)+5){row._swNoSwipe=true;setTimeout(function(){delete row._swNoSwipe;},300);return;}moved=true;dragging=true;closeOpen(wrap);}
+      if(!dragging)return;
+      e.preventDefault();
+      var nx=Math.max(-W,Math.min(0,curX+dx));
+      row.style.transform='translateX('+nx+'px)';
+      row.style.transition='none';
+    }
+    function onEnd(e){
+      document.removeEventListener('touchmove',onMove);
+      document.removeEventListener('touchend',onEnd);
+      if(!dragging)return;
+      var t=e.changedTouches[0];
+      var dx=t.clientX-sx;
+      var snap=dx<-W*0.35?-W:0;
+      row.style.transition='transform 0.22s cubic-bezier(.4,0,.2,1)';
+      row.style.transform='translateX('+snap+'px)';
+      row._swX=snap;
+      if(snap<0)_openSw=wrap;else if(_openSw===wrap)_openSw=null;
+    }
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('touchend',onEnd);
+  },{passive:true});
+
+  // Close open swipe on outside tap
+  scr.addEventListener('touchstart',function(e){
+    if(!e.target.closest('.sw'))closeOpen(null);
+  },{passive:true});
 }
 function showPFDomainHelp(){
   var html='<div class="sht"><div class="sht-h"></div>';
@@ -4153,7 +4122,7 @@ async function pfProxyFetch(url){
     if(start>=0&&end>start){
       return JSON.parse(text.substring(start,end));
     }
-  }catch(e){console.log('PF proxy err',e);}
+  }catch(e){}
   return null;
 }
 
@@ -4173,7 +4142,7 @@ async function pfSearch(addr){
     }
   }catch(e){
     // CORS blocked - try proxy
-    console.log('Direct fetch blocked, trying proxy...');
+    
   }
   // Fallback: proxy through Claude API
   var d2=await pfProxyFetch(PF_BASE+'/suggest/properties?q='+encodeURIComponent(addr));
@@ -4188,7 +4157,7 @@ async function pfGetProperty(pfId){
     var r=await fetch(PF_BASE+'/properties/'+pfId,{headers:{'Authorization':'Bearer '+PF_TOKEN,'Accept':'application/json'}});
     if(!r.ok)return null;
     var d=await r.json();_pfCache[ck]=d;return d;
-  }catch(e){console.log('PF prop err',e);}
+  }catch(e){}
   return null;
 }
 
@@ -4343,12 +4312,12 @@ async function dmCallAPI(endpoint, method, body){
     var r=await fetch('https://api.domain.com.au/v1'+endpoint, opts);
     if(r.ok)return await r.json();
     if(r.status===401||r.status===403){
-      console.log('Domain API: '+r.status+' '+endpoint);
+      
       return {_error:r.status};
     }
     return null;
   }catch(e){
-    console.log('Domain API network error:',e.message);
+    
     return {_error:'network'};
   }
 }
@@ -4379,7 +4348,7 @@ async function loadDomainData(p){
       }
     }
     sP();
-  }catch(e){console.log('loadDomainData err',e);}
+  }catch(e){}
 }
 
 async function searchDomainListings(suburb, listingType){
@@ -4472,7 +4441,7 @@ async function refreshListingAlerts(){
   toast('Searching latest listings across 7 suburbs...');
   var suburbs=['Greenvale','Mickleham','Craigieburn','Roxburgh Park','Sunbury','Donnybrook','Kalkallo'];
   var found=0;
-  var alerts=JSON.parse(localStorage.getItem('sa_alts')||'[]');
+  var alerts=gSaAlts();
   var seen=new Set(alerts.map(function(a){return a.addr+'|'+a.date;}));
   for(var i=0;i<suburbs.length;i++){
     var suburb=suburbs[i];
@@ -4500,9 +4469,9 @@ async function refreshListingAlerts(){
         });
         found++;
       });
-    }catch(e){console.log('Alert err for '+suburb+':',e);}
+    }catch(e){}
   }
-  localStorage.setItem('sa_alts',JSON.stringify(alerts.slice(0,50)));
+  sSaAlts(alerts.slice(0,50));
   if(found===0){
     toast('No new listings found (or API blocked). Check Domain setup.');
   } else {
@@ -4574,7 +4543,7 @@ async function refreshListingAlerts(){
           toast(isCall?'📞 Call logged':'💬 SMS logged');
         }
       }
-    }catch(err){console.log('tap log err',err);}
+    }catch(err){}
   }
   document.addEventListener('click', handleTap, true);
   // Also listen to touchend as backup — iOS sometimes skips click on tel:/sms: links
