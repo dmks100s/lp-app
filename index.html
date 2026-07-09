@@ -816,45 +816,10 @@ function fmtApptMonth(raw){var d=parseApptDate(raw);return d&&!isNaN(d)?d.toLoca
 function fmtApptFull(raw,time){var d=parseApptDate(raw);if(!d||isNaN(d))return raw||'';return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'})+(time?' at '+time:'');}
 function ago(d){var s=Math.floor((Date.now()-new Date(d))/1000);if(s<60)return 'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return Math.floor(s/604800)+'w';}
 
-/* ── DATA ADAPTER (lazy — runs on first access, not at parse time) ── */
-var _P_cache=null, _AP_cache=null, _HL_cache=null;
-var P={};  // placeholder — replaced by getter below
-Object.defineProperty(window,'P',{
-  get:function(){
-    if(!_P_cache){
-      _P_cache=_P.map(function(p){
-        return{id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',
-               status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''};
-      });
-    }
-    return _P_cache;
-  },
-  configurable:true
-});
-const ST=_ST;
-Object.defineProperty(window,'AP',{
-  get:function(){
-    if(!_AP_cache){
-      _AP_cache=(_AP||[]).map(function(a,i){
-        return{id:'ap'+i,a:a.a||'',n:a.n||'',d:a.d||'',p:fmtPh(a.p||''),
-               status:a.s||'CONFIRMED',archived:false,time:'10:00',notes:''};
-      });
-    }
-    return _AP_cache;
-  },
-  configurable:true
-});
-Object.defineProperty(window,'HL',{
-  get:function(){
-    if(!_HL_cache){
-      _HL_cache=(_HL||[]).map(function(h,i){
-        return{id:'hl'+i,a:h.a||'',n:h.n||'',p:fmtPh(h.p||''),category:'HOT STOCK',archived:false};
-      });
-    }
-    return _HL_cache;
-  },
-  configurable:true
-});
+/* ── DATA ADAPTER — lazy init inside functions, not at parse time ── */
+var _P_mapped=null, _AP_mapped=null, _HL_mapped=null;
+var ST=_ST;
+// P, AP, HL are computed lazily on first use inside gP(), gA(), gH()
 
 /* ── CSV MERGE ── */
 function mergeCsvData(){
@@ -886,15 +851,19 @@ const S={pg:'home',prev:'home',pid:null,cid:null,tid:null,fq:'',fst:'',fstr:'',c
 var _props=null,_ix=null,_appts=null,_hot=null,_contacts=null,_todos=null,_allCCache=null,_buyers=null,_listings=null;
 
 /* ── DATA ── */
-function gP(){if(!_props){var ov=JSON.parse(localStorage.getItem('lp')||'{}');var cu=JSON.parse(localStorage.getItem('lpc')||'[]');_props=P.map(function(p){var d=ov[p.id];return d?Object.assign({},p,d):Object.assign({},p);});cu.forEach(function(c){if(!_props.find(function(x){return x.id===c.id;}))_props.push(c);});}return _props;}
+function gP(){if(!_props){
+  // Lazy map _P on first gP() call — avoids blocking at parse time
+  if(!_P_mapped) _P_mapped=_P.map(function(p){return{id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''};});
+  var P=_P_mapped;
+  var ov=JSON.parse(localStorage.getItem('lp')||'{}');var cu=JSON.parse(localStorage.getItem('lpc')||'[]');_props=P.map(function(p){var d=ov[p.id];return d?Object.assign({},p,d):Object.assign({},p);});cu.forEach(function(c){if(!_props.find(function(x){return x.id===c.id;}))_props.push(c);});}return _props;}
 function sP(){
   invAllC();_allCCache=null;
   // Build index for O(1) lookup instead of O(n) P.find()
   if(!window._pidx){
     window._pidx={};
-    P.forEach(function(p){window._pidx[p.id]=p;});
+    (_P_mapped||[]).forEach(function(p){window._pidx[p.id]=p;});
   }
-  var ov={},cu=[];gP().forEach(function(p){var o=window._pidx?window._pidx[p.id]:P.find(function(x){return x.id===p.id;});if(!o){cu.push(p);return;}var d={};['status','no','e','p','n','a','s','isHot','archived','sb','vtype','beds','baths','cars','estval'].forEach(function(k){if(JSON.stringify(p[k])!==JSON.stringify(o[k]))d[k]=p[k];});if(Object.keys(d).length)ov[p.id]=d;});localStorage.setItem('lp',JSON.stringify(ov));localStorage.setItem('lpc',JSON.stringify(cu));}
+  var ov={},cu=[];gP().forEach(function(p){var o=window._pidx?window._pidx[p.id]:(_P_mapped||[]).find(function(x){return x.id===p.id;});if(!o){cu.push(p);return;}var d={};['status','no','e','p','n','a','s','isHot','archived','sb','vtype','beds','baths','cars','estval'].forEach(function(k){if(JSON.stringify(p[k])!==JSON.stringify(o[k]))d[k]=p[k];});if(Object.keys(d).length)ov[p.id]=d;});localStorage.setItem('lp',JSON.stringify(ov));localStorage.setItem('lpc',JSON.stringify(cu));}
 function gI(){if(!_ix)_ix=JSON.parse(localStorage.getItem('li')||'[]');return _ix;}
 function sI(){localStorage.setItem('li',JSON.stringify(gI()));}
 function gA(){if(!_appts){var sv=JSON.parse(localStorage.getItem('la')||'null');_appts=sv||AP.map(function(a){return Object.assign({},a);});}return _appts;}
@@ -1127,6 +1096,10 @@ function avatarUrl(name,email,size){
   /* REMOVED: was making HTTP requests to ui-avatars.com
      Now returns empty string — use ini() + avc() CSS instead */
   return '';
+}
+function applyTheme(){
+  var dark=S.theme==='dark';
+  document.body.className=dark?'dark':'light';
 }
 function toggleTheme(){S.theme=S.theme==='light'?'dark':'light';localStorage.setItem('th',S.theme);applyTheme();rTB();}
 applyTheme();
