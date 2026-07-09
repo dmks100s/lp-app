@@ -816,11 +816,45 @@ function fmtApptMonth(raw){var d=parseApptDate(raw);return d&&!isNaN(d)?d.toLoca
 function fmtApptFull(raw,time){var d=parseApptDate(raw);if(!d||isNaN(d))return raw||'';return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'})+(time?' at '+time:'');}
 function ago(d){var s=Math.floor((Date.now()-new Date(d))/1000);if(s<60)return 'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return Math.floor(s/604800)+'w';}
 
-/* ── DATA ADAPTER ── */
-const P=_P.map(p=>({id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''}));
+/* ── DATA ADAPTER (lazy — runs on first access, not at parse time) ── */
+var _P_cache=null, _AP_cache=null, _HL_cache=null;
+var P={};  // placeholder — replaced by getter below
+Object.defineProperty(window,'P',{
+  get:function(){
+    if(!_P_cache){
+      _P_cache=_P.map(function(p){
+        return{id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',
+               status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''};
+      });
+    }
+    return _P_cache;
+  },
+  configurable:true
+});
 const ST=_ST;
-const AP=_AP.map((a,i)=>({id:'ap'+i,a:a.a||'',n:a.n||'',d:a.d||'',p:fmtPh(a.p||''),status:a.s||'CONFIRMED',archived:false,time:'10:00',notes:''}));
-const HL=_HL.map((h,i)=>({id:'hl'+i,a:h.a||'',n:h.n||'',p:fmtPh(h.p||''),category:'HOT STOCK',archived:false}));
+Object.defineProperty(window,'AP',{
+  get:function(){
+    if(!_AP_cache){
+      _AP_cache=(_AP||[]).map(function(a,i){
+        return{id:'ap'+i,a:a.a||'',n:a.n||'',d:a.d||'',p:fmtPh(a.p||''),
+               status:a.s||'CONFIRMED',archived:false,time:'10:00',notes:''};
+      });
+    }
+    return _AP_cache;
+  },
+  configurable:true
+});
+Object.defineProperty(window,'HL',{
+  get:function(){
+    if(!_HL_cache){
+      _HL_cache=(_HL||[]).map(function(h,i){
+        return{id:'hl'+i,a:h.a||'',n:h.n||'',p:fmtPh(h.p||''),category:'HOT STOCK',archived:false};
+      });
+    }
+    return _HL_cache;
+  },
+  configurable:true
+});
 
 /* ── CSV MERGE ── */
 function mergeCsvData(){
@@ -849,7 +883,7 @@ function mergeCsvData(){
 const S={pg:'home',prev:'home',pid:null,cid:null,tid:null,fq:'',fst:'',fstr:'',cfq:'',gq:'',pgSz:40,
   theme:localStorage.getItem('th')||'light',
   bkSel:new Set(),bkStr:'',smSel:new Set(),propTab:'notes',detTab:'property'};
-var _props=null,_ix=null,_appts=null,_hot=null,_contacts=null,_todos=null;
+var _props=null,_ix=null,_appts=null,_hot=null,_contacts=null,_todos=null,_allCCache=null,_buyers=null,_listings=null;
 
 /* ── DATA ── */
 function gP(){if(!_props){var ov=JSON.parse(localStorage.getItem('lp')||'{}');var cu=JSON.parse(localStorage.getItem('lpc')||'[]');_props=P.map(function(p){var d=ov[p.id];return d?Object.assign({},p,d):Object.assign({},p);});cu.forEach(function(c){if(!_props.find(function(x){return x.id===c.id;}))_props.push(c);});}return _props;}
@@ -2014,6 +2048,9 @@ function allC(){
   return _allCCache;
 }
 function invAllC(){_allCCache=null;}
+var _saAlts_c=null;
+function gSaAlts(){if(!_saAlts_c)_saAlts_c=JSON.parse(localStorage.getItem('sa_alts')||'[]');return _saAlts_c;}
+function sSaAlts(a){_saAlts_c=a;localStorage.setItem('sa_alts',JSON.stringify(a));}
 
 function rContacts(){
   var q=(S.cfq||'').toLowerCase().trim();
