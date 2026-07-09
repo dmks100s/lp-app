@@ -1525,7 +1525,7 @@ function smRow(p,isA){
     '<div class="row" id="swr'+p.id+'">'+
       '<div class="bkc'+(chk?' on':'')+'" onclick="togSmSel('+p.id+')">'+(chk?'✓':'')+'</div>'+
       '<div class="row-in" onclick="oProp('+p.id+')">'+
-        '<img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(p.n)+'">'+
+        '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
         '<div class="av rnd '+avc(p.n)+'" style="display:none">'+ini(p.n)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( p.n||'Unknown')+'</div>'+
@@ -1719,7 +1719,7 @@ function pRow(p){
     '</div>'+
     '<div class="row" id="pr'+p.id+'">'+
       '<div class="row-in" onclick="oProp('+p.id+')">'+
-        '<img class="av" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(p.n)+'" style="border-radius:12px">'+
+        '<div class="av '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
         '<div class="av '+avc(p.n)+'" style="display:none;border-radius:12px">'+ini(p.n)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( p.a||'')+(isH?' <span class="bdg b-ht" style="font-size:9px;padding:1px 6px">🔥</span>':'')+'</div>'+
@@ -1770,7 +1770,7 @@ function rPDet(){
   // HERO
   '<div class="det-hero">'+
     '<div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px">'+
-      '<img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(p.n)+'" style="width:56px;height:56px;flex-shrink:0">'+
+      '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
       '<div class="av rnd '+avc(p.n)+'" style="display:none;width:56px;height:56px;flex-shrink:0;font-size:20px">'+ini(p.n)+'</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div class="det-name">'+(p.n||'Unknown Owner')+'</div>'+
@@ -2187,18 +2187,17 @@ function cLoadMore(){
   var shown=window._cShown||0;
   if(shown>=ff.length)return;
   var batch=ff.slice(shown,shown+100);
-  var frag=document.createDocumentFragment();
+  var _frags=[];
   batch.forEach(function(c){
     var div=document.createElement('div');
     div.innerHTML=cRow(c);
-    if(div.firstChild)frag.appendChild(div.firstChild);
+    _frags.push(div.innerHTML);
   });
   // Safely insert before sentinel, or append if not found
+  var _html=_frags.join('');
   var sentinel=document.getElementById('cl-sentinel');
-  try {
-    if(sentinel&&sentinel.parentNode===l) l.insertBefore(frag,sentinel);
-    else l.appendChild(frag);
-  } catch(e){ l.appendChild(frag); }
+  if(sentinel&&sentinel.parentNode===l){sentinel.insertAdjacentHTML('beforebegin',_html);}
+  else{l.innerHTML=(l.innerHTML||'')+_html;}
   window._cShown=shown+batch.length;
   setTimeout(swipes,30);
 }
@@ -2216,7 +2215,7 @@ function cRow(c){
     '</div>'+
     '<div class="row" id="cr'+c.id+'">'+
       '<div class="row-in" onclick="'+(c.src==='prop'?'oProp('+c.pid+')':'oCont(\''+c.id+'\')')+'">'+
-        '<img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'">'+
+        '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
         '<div class="av rnd '+avc(c.name)+'" style="display:none">'+ini(c.name)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( c.name||'Unknown')+'</div>'+
@@ -2270,7 +2269,7 @@ function hRow(h,isA){
   html+='</div>';
   html+='<div class="row" id="hr'+hid+'">';
   html+='<div class="row-in" style="cursor:pointer" onclick="'+open+'">';
-  html+='<img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy">';
+  html+='<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>';
   html+='<div class="av rnd '+avc(h.n||h.name)+'" style="display:none">'+ini(h.n||h.name)+'</div>';
   html+='<div style="flex:1;min-width:0">';
   html+='<div class="rt">'+(h.a||h.address||'')+'</div>';
@@ -2685,7 +2684,7 @@ function rSearch(){
   var gsEl=$('gs');
   if(gsEl){
     // Auto-focus on search tab
-    setTimeout(function(){if(document.getElementById('gs'))document.getElementById('gs').focus();},100);
+    setTimeout(function(){var _gs=document.getElementById('gs');if(_gs&&_gs.focus)_gs.focus();},100);
   }
 
   // Bind - only updates #gs-results, never touches the input
@@ -3412,7 +3411,7 @@ function renderAZIndex(containerId, getLetterFn){
   document.body.appendChild(el);
 }
 
-function removeAZIndex(){var el=document.getElementById('az-index');if(el)el.remove();}
+function removeAZIndex(){var el=document.getElementById('az-index');if(el&&el.parentNode)el.parentNode.removeChild(el);}
 
 
 function smartRefreshAlerts(){
