@@ -2934,7 +2934,10 @@ function rBulk(ov_arg){
 
   // ── HEADER ──
   html+='<div class="bk-header">';
-  html+='<div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">📨 Bulk SMS</div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1.2px">📨 Bulk SMS</div>'+
+    '<button class="btn-teal-sm" onclick="showBulkEmail()" style="touch-action:manipulation">✉️ Bulk Email</button>'+
+  '</div>';
 
   // Template grid
   html+='<div style="margin-bottom:10px"><div class="fl" style="margin-bottom:6px">Choose Template</div>';
@@ -3856,6 +3859,116 @@ function bkSendNext(){
 function debounce(fn,ms){var t;return function(){var a=arguments;clearTimeout(t);t=setTimeout(function(){fn.apply(null,a);},ms);};}
 function throttle(fn,ms){var last=0;return function(){var now=Date.now();if(now-last>=ms){last=now;fn.apply(null,arguments);}};}
 
+
+function srchBind(inputId,onSearch,onStore){
+  var inp=document.getElementById(inputId);if(!inp)return;
+  var timer=null;
+  function run(){var v=inp.value||'';if(onStore)onStore(v);clearTimeout(timer);timer=setTimeout(function(){onSearch(v);},150);}
+  inp.addEventListener('input',run);
+  inp.addEventListener('compositionend',run);
+}
+
+
+function showPostCall(ph,nm,ad,pid,oc,notes){
+  var fn=(nm||'').split(' ')[0]||'there';
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div><div class="sht-ttl">✅ Call Logged</div>'+
+    '<div class="sht-sub">'+(nm||ad||'Contact')+' &middot; '+(oc||'').replace(/_/g,' ')+'</div></div>'+
+    '<button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div class="sht-bd" style="display:flex;flex-direction:column;gap:10px">'+
+    (notes&&notes.trim()?'<div style="background:var(--gnbg);border:1px solid rgba(5,150,105,.2);border-radius:12px;padding:10px 14px;font-size:12px;color:var(--green)">📋 '+esc(notes.substring(0,80))+'</div>':'') +
+    (ph?'<button class="btn btn-tl" style="width:100%;touch-action:manipulation" onclick="cls();smsM(\''+esc(ph)+'\',\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">💬 Send SMS Follow-up</button>':'') +
+    (ph?'<button class="btn btn-bl" style="width:100%;touch-action:manipulation" onclick="cls();emailM(\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">✉️ Send Email</button>':'') +
+    (pid?'<button class="btn btn-gh" style="width:100%;touch-action:manipulation" onclick="cls();oProp('+(pid||'null')+')">🏠 View Property</button>':'') +
+    '<button class="btn btn-gh" style="width:100%;touch-action:manipulation" onclick="cls()">Done</button>'+
+    '</div></div>');
+}
+
+function emailM(nm,ad,pid){
+  var tpls=[
+    {l:'Market Update',s:'Property Market Update',b:'Dear '+(nm||'Homeowner')+',\n\nI hope this message finds you well. I wanted to share a quick market update for your area.\n\nWe are seeing strong buyer demand with several properties recently achieving outstanding results. If you have been considering your options, now could be an ideal time to discuss.\n\nI would love to offer you a complimentary, no-obligation appraisal.\n\nKind regards,\nAlex Doguluer\nLuxe Properties Melbourne\n0434 342 390'},
+    {l:'Just Sold',s:'Recent Sale Near Your Property',b:'Dear '+(nm||'Homeowner')+',\n\nExciting news — we have just sold a property close to yours at an outstanding result, well above expectations.\n\nThis buyer demand creates a wonderful opportunity for sellers in your area right now.\n\nWould you like to know what your property could achieve?\n\nKind regards,\nAlex Doguluer\nLuxe Properties Melbourne\n0434 342 390'},
+    {l:'Free Appraisal',s:'Complimentary Property Appraisal — No Obligation',b:'Dear '+(nm||'Homeowner')+',\n\nI am reaching out to offer you a complimentary property appraisal for '+(ad||'your property')+'.\n\nThere is absolutely no obligation — I simply want to ensure you have accurate, up-to-date information about your property.\n\nKind regards,\nAlex Doguluer\nLuxe Properties Melbourne\n0434 342 390'},
+    {l:'Introduction',s:'Introduction — Luxe Properties Melbourne',b:'Dear '+(nm||'Homeowner')+',\n\nMy name is Alex Doguluer, Director of Luxe Properties Melbourne. I specialise in premium results for homeowners in your area.\n\nI would love to introduce myself and discuss your property goals at a time that suits you.\n\nKind regards,\nAlex Doguluer\nLuxe Properties Melbourne\n0434 342 390'},
+  ];
+  window._eTpls=tpls;window._eTi=0;
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div><div class="sht-ttl">✉️ Send Email</div>'+
+    '<div class="sht-sub">'+(nm||ad||'Owner')+'</div></div>'+
+    '<button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div class="sht-bd">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">'+
+      tpls.map(function(t,i){return'<div class="bk-tmpl-card'+(i===0?' on':'')+'" onclick="pickETpl('+i+')" style="touch-action:manipulation;padding:8px"><div style="font-size:11px;font-weight:700">'+t.l+'</div></div>';}).join('')+
+      '</div>'+
+      '<div class="fg"><div class="fl">Subject</div><input class="fi" id="em-s" value="'+esc(tpls[0].s)+'" style="font-size:14px"></div>'+
+      '<div class="fg"><div class="fl">Message</div><textarea class="fta" id="em-b" style="min-height:150px;font-size:13px">'+esc(tpls[0].b)+'</textarea></div>'+
+    '</div>'+
+    '<div class="sht-ft">'+
+      '<button class="btn btn-gh" onclick="cls()">Cancel</button>'+
+      '<button class="btn btn-tl" style="flex:2;touch-action:manipulation" onclick="doEmail(\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Email App</button>'+
+    '</div></div>');
+}
+
+function pickETpl(i){
+  var t=(window._eTpls||[])[i];if(!t)return;
+  document.querySelectorAll('.bk-tmpl-card').forEach(function(el,idx){el.classList.toggle('on',idx===i);});
+  var s=document.getElementById('em-s');if(s)s.value=t.s;
+  var b=document.getElementById('em-b');if(b)b.value=t.b;
+}
+
+function doEmail(nm,ad,pid){
+  var s=(document.getElementById('em-s')||{value:''}).value||'';
+  var b=(document.getElementById('em-b')||{value:''}).value||'';
+  window.open('mailto:?subject='+encodeURIComponent(s)+'&body='+encodeURIComponent(b),'_self');
+  gI().push({id:Date.now(),type:'email',name:nm,address:ad,propertyId:pid,outcome:'sent',notes:s,date:new Date().toISOString()});
+  sI();cls();toast('✉️ Email opened');
+}
+
+
+function showBulkEmail(){
+  var sel=S.bkSel;
+  var awp=gP().filter(function(p){return!p.archived&&p.e;});
+  var pool=sel&&sel.size>0?awp.filter(function(p){return sel.has(p.id);}):awp.slice(0,50);
+  if(!pool.length){toast('No contacts with email in selection');return;}
+  var tpls=[
+    {l:'Market Update',s:'Property Market Update — Your Area',b:'Dear [Name],\n\nI hope this message finds you well. I wanted to share a quick market update for your area.\n\nWe are seeing strong buyer demand with several properties recently achieving outstanding results. If you have been considering your options, now could be an ideal time to discuss.\n\nI would love to offer you a complimentary, no-obligation appraisal.\n\nKind regards,\nAlex Doguluer\nLuxe Properties Melbourne | 0434 342 390'},
+    {l:'Just Sold',s:'Recent Sale Result Near Your Property',b:'Dear [Name],\n\nWe have just sold a property close to yours at an outstanding result, well above expectations.\n\nThis buyer demand creates a wonderful opportunity for homeowners in your area right now.\n\nKind regards,\nAlex Doguluer | Luxe Properties Melbourne | 0434 342 390'},
+    {l:'Free Appraisal',s:'Complimentary Property Appraisal',b:'Dear [Name],\n\nI would love to offer you a complimentary property appraisal — absolutely no obligation.\n\nMany homeowners in your area are pleasantly surprised by their property value right now.\n\nKind regards,\nAlex Doguluer | Luxe Properties Melbourne | 0434 342 390'},
+  ];
+  window._beTpls=tpls;window._beTi=0;window._bePool=pool;
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div><div class="sht-ttl">✉️ Bulk Email</div>'+
+    '<div class="sht-sub">'+pool.length+' contacts with email</div></div>'+
+    '<button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div class="sht-bd">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">'+
+      tpls.map(function(t,i){return'<div class="bk-tmpl-card'+(i===0?' on':'')+'" onclick="pickBETpl('+i+')" style="touch-action:manipulation;padding:8px 10px"><div style="font-size:11px;font-weight:700">'+t.l+'</div></div>';}).join('')+
+      '</div>'+
+      '<div class="fg"><div class="fl">Subject</div><input class="fi" id="be-s" value="'+esc(tpls[0].s)+'" style="font-size:14px"></div>'+
+      '<div class="fg"><div class="fl">Message <span style="font-weight:400;color:var(--muted)">(use [Name] for personalisation)</span></div><textarea class="fta" id="be-b" style="min-height:120px;font-size:12px">'+esc(tpls[0].b)+'</textarea></div>'+
+    '</div>'+
+    '<div class="sht-ft">'+
+      '<button class="btn btn-gh" onclick="cls()">Cancel</button>'+
+      '<button class="btn btn-tl" style="flex:2;touch-action:manipulation" onclick="doBulkEmail()">Open Email ('+pool.length+')</button>'+
+    '</div></div>');
+}
+function pickBETpl(i){
+  var t=(window._beTpls||[])[i];if(!t)return;
+  document.querySelectorAll('.bk-tmpl-card').forEach(function(el,idx){el.classList.toggle('on',idx===i);});
+  var s=document.getElementById('be-s');if(s)s.value=t.s;
+  var b=document.getElementById('be-b');if(b)b.value=t.b;
+}
+function doBulkEmail(){
+  var pool=window._bePool||[];
+  if(!pool.length){cls();return;}
+  var s=(document.getElementById('be-s')||{value:''}).value||'';
+  var b=(document.getElementById('be-b')||{value:''}).value||'';
+  var emails=pool.slice(0,15).map(function(p){return p.e;}).filter(Boolean).join(',');
+  window.open('mailto:'+emails+'?subject='+encodeURIComponent(s)+'&body='+encodeURIComponent(b.replace(/\[Name\]/g,'there')),'_self');
+  pool.forEach(function(p){gI().push({id:Date.now()+Math.random(),type:'email',name:p.n,address:p.a,propertyId:p.id,outcome:'sent',notes:'Bulk email: '+s,date:new Date().toISOString()});});
+  sI();cls();toast('✉️ Email opened');
+}
+
 /* ── ADD MENUS ── */
 function addMenu(){modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">Add New</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd" style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-gd btn-fw" onclick="cls();addPropM()">🏠 New Property</button><button class="btn btn-bl btn-fw" onclick="cls();addContM()">👤 New Contact</button><button class="btn btn-gh btn-fw" onclick="cls();appraisalM()">📅 New Appraisal</button><button class="btn btn-gh btn-fw" onclick="cls();addTodoM()">✅ New Task</button></div><div style="height:10px"></div></div>');}
 function addPropM(){modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">🏠 New Property</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Address</div><input class="fi" id="npa" placeholder="15 Example St, Greenvale VIC 3059"></div><div class="fg"><div class="fl">Street Group</div><input class="fi" id="nps" placeholder="e.g. HILLVIEW RD"></div><div class="fg"><div class="fl">Owner Name</div><input class="fi" id="npn" placeholder="Full name"></div><div class="frow"><div class="fg"><div class="fl">Phone</div><input class="fi" id="npp" type="tel" placeholder="04XX XXX XXX"></div><div class="fg"><div class="fl">Email</div><input class="fi" id="npe" type="email" placeholder="email@..."></div></div><div class="fg"><div class="fl">Vendor Type</div><select class="fs" id="npvt"><option value="">Not set</option><option value="upsizer">Upsizer</option><option value="downsizer">Downsizer</option><option value="investor">Investor</option><option value="seller">Potential Seller</option></select></div><div class="fg"><div class="fl">Status</div><select class="fs" id="npst">'+sopts('uncontacted')+'</select></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveProp()">Add Property</button></div></div>');}
@@ -3965,11 +4078,11 @@ function saveCall(ph,nm,ad,pid){var realPh=fmtPh(($('call-ph')&&$('call-ph').val
       }
       sP();
     }
-  }cls();toast('Call logged · '+oc.replace(/_/g,' '));if(S.pg==='pdet')rPDet();
-  else if(S.pg==='smart')rSmart();
-  else if(S.pg==='home')rHome();
-  else if(S.pg==='props')rProps();
-  bdg();if(['voicemail','connected','interested','callback'].includes(oc)&&realPh)setTimeout(function(){if(confirm('Send SMS follow-up?'))smsM(realPh,nm,ad,pid);},150);}
+  }cls();toast('Call logged · '+oc.replace(/_/g,' '));
+  if(S.pg==='pdet')rPDet();else if(S.pg==='smart')rSmart();else if(S.pg==='home')rHome();else if(S.pg==='props')rProps();
+  bdg();
+  setTimeout(function(){showPostCall(realPh,nm,ad,pid,oc,nt);},250);
+}
 
 /* ── SMS ── */
 function smsM(ph,nm,ad,pid){var fn=(nm||'').split(' ')[0]||'there';var ts=TMPLS.map(function(t){return Object.assign({},t,{t:t.t.replace(/\[Name\]/g,fn).replace(/\[Address\]/g,ad||'').replace(/\[Street\]/g,'').replace(/\[Suburb\]/g,'')});});modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">💬 SMS</div><div class="sht-sub">'+(nm||'Owner')+' · '+(ph||'No phone')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Template</div>'+ts.map(function(t,i){return'<div class="tc'+(i===0?' on':'')+'" id="st'+i+'" onclick="pickT('+i+')"><div class="tr">'+(i===0?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.l+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+'</div><div class="fg"><div class="fl">Message <span id="slen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="smst" style="min-height:120px" oninput="window._sm=this.value;$$(\'slen\').textContent=this.value.length+\' chars\'">'+(ts[0].t)+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+(ph?'<a class="btn btn-gd" id="smsl" href="sms:'+ph+'?body='+encodeURIComponent(ts[0].t)+'" onclick="logSMS(\''+esc(ph)+'\',\''+esc(nm)+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Messages →</a>':'<button class="btn btn-gd" disabled style="opacity:.35">No phone</button>')+'</div></div>');window._smTs=ts;window._smPh=ph;$('slen').textContent=ts[0].t.length+' chars';}
