@@ -1,4 +1,4 @@
-<!-- v36 build 20260706064123 -->
+<!-- v37 build 20260709230049 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -723,16 +723,20 @@ input[type=date],input[type=time]{color-scheme:light dark;}
     <div class="tab" id="t-smart" onclick="go('smart')"><div class="tab-i">📞</div><div class="tab-t">Prospecting</div><div class="dot gd" id="bd-smart" style="display:none"></div></div>
     <div class="tab" id="t-props" onclick="go('props')"><div class="tab-i">⌂</div><div class="tab-t">Properties</div></div>
     <div class="tab" id="t-contacts" onclick="go('contacts')"><div class="tab-i">👤</div><div class="tab-t">Contacts</div></div>
-    <div class="tab" id="t-search" onclick="go('search')"><div class="tab-i">🔍</div><div class="tab-t">Search</div></div>
-    <div class="tab" id="t-log" onclick="go('log')"><div class="tab-i">📋</div><div class="tab-t">Call Log</div></div>
-    <div class="tab" id="t-buyers" onclick="go('buyers')"><div class="tab-i">🔍</div><div class="tab-t">Buyers</div></div>
-    <div class="tab" id="t-listings" onclick="go('listings')"><div class="tab-i">🏠</div><div class="tab-t">Listings</div></div>
-    <div class="tab" id="t-appt" onclick="go('appt')"><div class="tab-i">📅</div><div class="tab-t">Appts</div><div class="dot" id="bd-appt" style="display:none"></div></div>
-    <div class="tab" id="t-todo" onclick="go('todo')"><div class="tab-i">✅</div><div class="tab-t">To Do</div><div class="dot" id="bd-todo" style="display:none"></div></div>
+    <div class="tab" id="t-more" onclick="moreMenu()"><div class="tab-i">☰</div><div class="tab-t">More</div><div class="dot" id="bd-appt" style="display:none"></div></div>
+    
+    
+    
+    
+    
   </div>
 </div>
 <div id="toast"></div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>@keyframes spin{to{transform:rotate(360deg)}}
+.bkc{width:24px;height:24px;min-width:24px;border-radius:7px;border:2px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#0A0A0A;flex-shrink:0;margin-right:10px;transition:all .12s}
+.bkc.on{background:#C9A96E;border-color:#C9A96E}
+.more-grid-item:active{transform:scale(.96)}
+</style>
 <script src="data2.js"></script>
 <script>
 
@@ -1107,12 +1111,13 @@ applyTheme();
 /* ── NAV ── */
 function go(pg,skipPrev){
   removeAZIndex();
+  var _stray=document.getElementById('mod');if(_stray)_stray.remove();
   // Fast: scroll to top immediately
   var scr=document.getElementById('scr');
   if(scr) scr.scrollTop=0;
   if(!skipPrev)S.prev=S.pg;
   S.pg=pg;
-  ['home','smart','props','contacts','appt','todo','search','log'].forEach(function(t){var e=$('t-'+t);if(e)e.classList.toggle('on',t===pg);});
+  ['home','smart','props','contacts'].forEach(function(t){var e=$('t-'+t);if(e)e.classList.toggle('on',t===pg);});var _mt=$('t-more');if(_mt)_mt.classList.toggle('on',['appt','todo','search','log','buyers','listings','streets','hot','bulk'].includes(pg));
   $('scr').scrollTop=0;S.pgSz=40;
   rTB();
   var fns={home:rHome,smart:rSmart,props:rProps,contacts:rContacts,appt:rAppt,todo:rTodo,pdet:rPDet,cdet:rCDet,streets:rStreets,hot:rHot,log:rLog,bulk:rBulk,search:rSearch,buyers:rBuyers,listings:rListings};
@@ -1364,6 +1369,75 @@ function rHome(){
   $('scr').innerHTML=html;
 }
 
+
+/* ── v37: DAILY TARGETS ── */
+function gTarg(){var t={};try{t=JSON.parse(localStorage.getItem('lp_targets')||'{}');}catch(e){}return{calls:+t.calls||50,sms:+t.sms||20,appts:+t.appts||2};}
+function targetM(){var t=gTarg();modal('<div class="sht"><div class="sht-h"></div>'+
+ '<div class="sht-hdr"><div><div class="sht-ttl">🎯 Daily Targets</div><div class="sht-sub">Set your own prospecting goals</div></div><button class="sht-x" onclick="cls()">✕</button></div>'+
+ '<div class="sht-bd" style="display:flex;flex-direction:column;gap:12px">'+
+ '<div><div class="fl">Calls per day</div><input class="fi" id="tg-calls" type="number" min="1" inputmode="numeric" value="'+t.calls+'"></div>'+
+ '<div><div class="fl">SMS per day</div><input class="fi" id="tg-sms" type="number" min="0" inputmode="numeric" value="'+t.sms+'"></div>'+
+ '<div><div class="fl">Appointments per day</div><input class="fi" id="tg-appts" type="number" min="0" inputmode="numeric" value="'+t.appts+'"></div>'+
+ '<button onclick="saveTarg()" style="width:100%;padding:14px;border:none;border-radius:12px;background:#C9A96E;color:#0A0A0A;font-weight:800;font-size:15px;cursor:pointer">Save Targets</button>'+
+ '</div></div>');}
+function saveTarg(){function v(id){var e=document.getElementById(id);return e?(+e.value||0):0;}localStorage.setItem('lp_targets',JSON.stringify({calls:v('tg-calls'),sms:v('tg-sms'),appts:v('tg-appts')}));cls();toast('Targets saved');if(S.pg==='smart')rSmart();}
+
+/* ── v37: START CALLING MODE ── */
+function smDeselAll(){S.smSel=new Set();rSmart();}
+function startCalling(){
+  var pp=gP().filter(function(p){return!p.archived;});
+  var hl=gH().filter(function(h){return!h.archived;});
+  var hotS=pp.filter(function(p){return p.isHot||hl.find(function(h){return h.a===p.a;});});
+  var callL=pp.filter(function(p){return['callback','interested','voicemail','no_answer'].includes(p.status);});
+  var all=[...new Map([...hotS,...callL].map(function(p){return[p.id,p];})).values()];
+  var arch=gSA();var active=all.filter(function(p){return!arch.includes(p.id)&&p.p;});
+  var q=(S.smSel&&S.smSel.size>0)?active.filter(function(p){return S.smSel.has(p.id);}):active;
+  if(!q.length){toast('No contacts with phone numbers to call');return;}
+  window._cq=q;window._ci=0;callModeM();
+}
+function callModeM(){
+  var q=window._cq||[];var i=window._ci||0;
+  if(i>=q.length){var m=$('mod');if(m)m.remove();toast('🎉 Call session complete — '+q.length+' contacts');rSmart();return;}
+  var p=q[i];var m0=$('mod');if(m0)m0.remove();
+  modal('<div class="sht"><div class="sht-h"></div>'+
+  '<div class="sht-hdr"><div><div class="sht-ttl">📞 Call '+(i+1)+' of '+q.length+'</div><div class="sht-sub">Smart Call session</div></div><button class="sht-x" onclick="cls()">✕</button></div>'+
+  '<div class="sht-bd" style="display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center">'+
+  '<div class="av rnd '+avc(p.n||'')+'" style="width:64px;height:64px;font-size:24px;line-height:64px">'+ini(p.n||'?')+'</div>'+
+  '<div style="font-size:18px;font-weight:800">'+esc(p.n||'Unknown')+'</div>'+
+  '<div style="font-size:13px;color:var(--muted)">'+esc(p.a||'')+(p.sb?' · '+esc(p.sb):'')+'</div>'+
+  '<span class="bdg '+bc(p.status)+'">'+((p.status||'new').replace(/_/g,' '))+'</span>'+
+  '<a href="tel:'+p.p+'" style="display:block;width:100%;padding:16px;border-radius:14px;background:#22C55E;color:#fff;font-weight:800;font-size:16px;text-decoration:none">📞 Call '+fmtPh(p.p)+'</a>'+
+  '<div style="width:100%;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left">Log outcome & next</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">'+
+  '<button class="btn-ghost-sm" onclick="smOutcome('+p.id+',\'interested\')" style="padding:12px">✅ Interested</button>'+
+  '<button class="btn-ghost-sm" onclick="smOutcome('+p.id+',\'callback\')" style="padding:12px">🔁 Callback</button>'+
+  '<button class="btn-ghost-sm" onclick="smOutcome('+p.id+',\'voicemail\')" style="padding:12px">🗣 Voicemail</button>'+
+  '<button class="btn-ghost-sm" onclick="smOutcome('+p.id+',\'no_answer\')" style="padding:12px">📵 No Answer</button>'+
+  '</div>'+
+  '<div style="display:flex;gap:8px;width:100%">'+
+  '<button class="btn-ghost-sm" style="flex:1" onclick="callNext()">Skip ›</button>'+
+  '<button class="btn-ghost-sm" style="flex:1" onclick="var _q=window._cq,_i=window._ci;cls();oProp('+p.id+');window._cq=_q;window._ci=_i;">Open Property</button>'+
+  '</div></div></div>');
+}
+function smOutcome(pid,oc){
+  var p=gP().find(function(x){return x.id===pid;});
+  if(p){gI().push({id:Date.now(),type:'call',propertyId:pid,address:p.a,name:p.n,phone:p.p,outcome:oc,notes:'Logged via Start Calling',date:new Date().toISOString()});sI();p.status=oc;p.lastContact=new Date().toISOString();sP();}
+  toast((oc||'').replace(/_/g,' ')+' logged');
+  callNext();
+}
+function callNext(){window._ci=(window._ci||0)+1;callModeM();}
+
+/* ── v37: MORE MENU (simplified bottom nav) ── */
+function moreMenu(){
+  modal('<div class="sht"><div class="sht-h"></div>'+
+  '<div class="sht-hdr"><div><div class="sht-ttl">More</div><div class="sht-sub">All tools</div></div><button class="sht-x" onclick="cls()">✕</button></div>'+
+  '<div class="sht-bd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-bottom:24px">'+
+  [['search','🔍','Search'],['appt','📅','Appointments'],['todo','✅','To Do'],['hot','🔥','Hot List'],['bulk','💬','Bulk SMS'],['log','📋','Call Log'],['buyers','🧲','Buyers'],['listings','🏷','My Listings'],['streets','🛣','Streets']].map(function(x){
+    return '<div class="more-grid-item" onclick="cls();go(\''+x[0]+'\')" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 6px;text-align:center;cursor:pointer;touch-action:manipulation"><div style="font-size:24px">'+x[1]+'</div><div style="font-size:11px;font-weight:700;margin-top:6px;color:var(--text)">'+x[2]+'</div></div>';
+  }).join('')+
+  '</div></div>');
+}
+
 function rSmart(){
   var pp=gP().filter(function(p){return!p.archived;});
   var hl=gH().filter(function(h){return!h.archived;});
@@ -1373,7 +1447,7 @@ function rSmart(){
   var arch=gSA();var active=all.filter(function(p){return!arch.includes(p.id);});
   var sel=S.smSel;
   var todCalls=gI().filter(function(i){return new Date(i.date).toDateString()===new Date().toDateString()&&i.type==='call';}).length;
-  var target=50;var pct=Math.min(100,Math.round(todCalls/target*100));
+  var target=gTarg().calls;var pct=Math.min(100,Math.round(todCalls/target*100));
 
   $('scr').innerHTML=
   '<div class="smart-hdr">'+
@@ -1381,11 +1455,13 @@ function rSmart(){
     '<div class="smart-hdr-sub">'+active.length+' priority leads · tap to call · swipe to archive</div>'+
     '<div class="call-progress-wrap">'+
       '<div class="call-progress-bar-bg"><div class="call-progress-bar-fill" style="width:'+pct+'%"></div></div>'+
-      '<div class="call-progress-label">Today\'s calls: <strong>'+todCalls+' / '+target+'</strong></div>'+
+      '<div class="call-progress-label">Today\'s calls: <strong>'+todCalls+' / '+target+'</strong> <span onclick="targetM()" style="cursor:pointer;opacity:.85;margin-left:6px;text-decoration:underline">⚙️ targets</span></div>'+
     '</div>'+
   '</div>'+
   '<div class="smart-toolbar">'+
+    '<button class="btn-teal-sm" onclick="startCalling()" style="font-weight:800">▶ Start Calling</button>'+
     '<button class="btn-ghost-sm" onclick="smSelAll()">'+( sel.size===active.length&&active.length>0?'Deselect All':'☑ Select All')+'</button>'+
+    (sel.size>0&&sel.size<active.length?'<button class="btn-ghost-sm" onclick="smDeselAll()">✕ Clear</button>':'')+
     '<div style="flex:1"></div>'+
     (sel.size>0?'<button class="btn-teal-sm" onclick="smBulkSMS()">💬 SMS '+sel.size+'</button><button class="btn-ghost-sm" onclick="smBulkArch()">📦</button>':'<span style="font-size:12px;color:var(--muted)">Tick contacts to bulk action</span>')+
   '</div>'+
@@ -1525,7 +1601,7 @@ function smRow(p,isA){
     '<div class="row" id="swr'+p.id+'">'+
       '<div class="bkc'+(chk?' on':'')+'" onclick="togSmSel('+p.id+')">'+(chk?'✓':'')+'</div>'+
       '<div class="row-in" onclick="oProp('+p.id+')">'+
-        '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
+        '<div class="av rnd '+avc(p.n||'')+'">'+ini(p.n||'?')+'</div>'+
         '<div class="av rnd '+avc(p.n)+'" style="display:none">'+ini(p.n)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( p.n||'Unknown')+'</div>'+
@@ -1719,7 +1795,7 @@ function pRow(p){
     '</div>'+
     '<div class="row" id="pr'+p.id+'">'+
       '<div class="row-in" onclick="oProp('+p.id+')">'+
-        '<div class="av '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
+        '<div class="av '+avc(p.n||'')+'">'+ini(p.n||'?')+'</div>'+
         '<div class="av '+avc(p.n)+'" style="display:none;border-radius:12px">'+ini(p.n)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( p.a||'')+(isH?' <span class="bdg b-ht" style="font-size:9px;padding:1px 6px">🔥</span>':'')+'</div>'+
@@ -1759,18 +1835,25 @@ function loadMoreProps(){
   setTimeout(swipes,50);
 }
 
+
+/* v37: fallback suburb medians (display-only, used when no Pricefinder estimate) */
+var SUBURB_DATA={
+ 'Greenvale':{med:'~$950K'},'Mickleham':{med:'~$680K'},'Craigieburn':{med:'~$660K'},
+ 'Roxburgh Park':{med:'~$650K'},'Sunbury':{med:'~$640K'},'Donnybrook':{med:'~$620K'},
+ 'Kalkallo':{med:'~$630K'},'Gowanbrae':{med:'~$800K'},'Melbourne':{med:'—'}
+};
 function rPDet(){
   var p=gP().find(function(x){return x.id===S.pid;});if(!p){go('props');return;}
   var hl=gH().filter(function(h){return!h.archived;});var isH=p.isHot||hl.find(function(h){return h.a===p.a;});
   var pix=gI().filter(function(i){return i.propertyId===p.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-  var sub=SUBURB_DATA[p.sb]||SUBURB_DATA['Melbourne'];
+  var sub=(typeof SUBURB_DATA!=='undefined'&&(SUBURB_DATA[p.sb]||SUBURB_DATA['Melbourne']))||{};
   var tab=S.detTab||'notes';
 
   $('scr').innerHTML=
   // HERO
   '<div class="det-hero">'+
     '<div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px">'+
-      '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
+      '<div class="av rnd '+avc(p.n||'')+'">'+ini(p.n||'?')+'</div>'+
       '<div class="av rnd '+avc(p.n)+'" style="display:none;width:56px;height:56px;flex-shrink:0;font-size:20px">'+ini(p.n)+'</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div class="det-name">'+(p.n||'Unknown Owner')+'</div>'+
@@ -2215,7 +2298,7 @@ function cRow(c){
     '</div>'+
     '<div class="row" id="cr'+c.id+'">'+
       '<div class="row-in" onclick="'+(c.src==='prop'?'oProp('+c.pid+')':'oCont(\''+c.id+'\')')+'">'+
-        '<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>'+
+        '<div class="av rnd '+avc(c.name||'')+'">'+ini(c.name||'?')+'</div>'+
         '<div class="av rnd '+avc(c.name)+'" style="display:none">'+ini(c.name)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="rt">'+( c.name||'Unknown')+'</div>'+
@@ -2269,7 +2352,7 @@ function hRow(h,isA){
   html+='</div>';
   html+='<div class="row" id="hr'+hid+'">';
   html+='<div class="row-in" style="cursor:pointer" onclick="'+open+'">';
-  html+='<div class="av rnd '+avc(p.n||c.name||nm||""||'')+'">'+ini(p.n||c.name||nm||""||'?')+'</div>';
+  html+='<div class="av rnd '+avc(h.n||h.name||'')+'">'+ini(h.n||h.name||'?')+'</div>';
   html+='<div class="av rnd '+avc(h.n||h.name)+'" style="display:none">'+ini(h.n||h.name)+'</div>';
   html+='<div style="flex:1;min-width:0">';
   html+='<div class="rt">'+(h.a||h.address||'')+'</div>';
@@ -2703,14 +2786,14 @@ function rSearch(){
     results.map(function(r){
       if(r.type==='prop'){var p=r.p;
         return '<div class="row" style="cursor:pointer" onclick="oProp('+p.id+')">'+
-          '<div class="av rnd '+avc(p.n||c.name||'')+'">'+ini(p.n||c.name||'?')+'</div>'+
+          '<div class="av rnd '+avc(p.n||'')+'">'+ini(p.n||'?')+'</div>'+
           '<div class="av '+avc(p.n)+'" style="display:none;border-radius:12px">'+ini(p.n)+'</div>'+
           '<div style="flex:1;min-width:0"><div class="rt">'+(p.a||'')+'</div><div class="rs">'+(p.n||'Unknown')+'</div>'+
           '<div class="rm"><span class="bdg '+bc(p.status)+'">'+(p.status||'').replace(/_/g,' ')+'</span><span style="font-size:10px;color:var(--muted)">Property</span></div></div></div>';
       }
       if(r.type==='cont'){var ct=r.c;
         return '<div class="row" style="cursor:pointer" onclick="'+(ct.src==='prop'?'oProp('+ct.pid+')':"oCont('"+ct.id+"')")+'">'+
-          '<div class="av rnd '+avc(p.n||c.name||'')+'">'+ini(p.n||c.name||'?')+'</div>'+
+          '<div class="av rnd '+avc(p.n||'')+'">'+ini(p.n||'?')+'</div>'+
           '<div class="av rnd '+avc(ct.name)+'" style="display:none">'+ini(ct.name)+'</div>'+
           '<div style="flex:1;min-width:0"><div class="rt">'+(ct.name||'Unknown')+'</div><div class="rs">'+(ct.phone||ct.email||'—')+'</div>'+
           '<div class="rm"><span style="font-size:10px;color:var(--muted)">Contact</span></div></div></div>';
@@ -3130,8 +3213,8 @@ function pickTpl(i){
   }
 }
 
-function bkSelAll(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);S.bkSel=S.bkSel.size===pool.length?new Set():new Set(pool.map(function(p){return p.id;}));rBulk();}
-function togBk(id){if(S.bkSel.has(id))S.bkSel.delete(id);else S.bkSel.add(id);var cb=document.querySelector('.bki [onclick="togBk('+id+')"]');if(cb){cb.classList.toggle('on',S.bkSel.has(id));cb.textContent=S.bkSel.has(id)?'✓':'';}var btn=document.querySelector('[onclick="startBulk()"]');if(btn)btn.textContent='▶ Send '+(S.bkSel.size>0?S.bkSel.size:document.querySelectorAll('.bki').length)+' SMS';}
+/* duplicate bkSelAll removed v37 */
+/* duplicate togBk removed v37 */
 var _bQ=[],_bI=0,_bMsg='';
 function startBulk(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);var send=S.bkSel.size>0?pool.filter(function(p){return S.bkSel.has(p.id);}):pool;if(!send.length){toast('No contacts to send to');return;}_bMsg=window._bkMsg||TMPLS[window._bkTi||0].m;_bQ=send;_bI=0;nxtBulk();}
 function nxtBulk(){if(_bI>=_bQ.length){toast('✅ All '+_bQ.length+' SMS complete');S.bkSel=new Set();window._bkOv=null;return;}var p=_bQ[_bI];var msg=_bMsg.replace(/\[Name\]/g,(p.n||'there').split(' ')[0]).replace(/\[Address\]/g,p.a||'').replace(/\[Street\]/g,p.s||'').replace(/\[Suburb\]/g,p.sb||'');window.open('sms:'+p.p+'?body='+encodeURIComponent(msg),'_self');gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a,name:p.n,phone:p.p,outcome:'sent',notes:msg.substring(0,80),date:new Date().toISOString()});sI();_bI++;if(_bI<_bQ.length){setTimeout(function(){if(confirm('SMS '+_bI+'/'+_bQ.length+' sent.\n\nNext: '+(_bQ[_bI].n||'?')+' — '+_bQ[_bI].p+'\n\nSend next?'))nxtBulk();else toast('Paused at '+_bI);},1200);}else{setTimeout(function(){toast('✅ All '+_bQ.length+' SMS sent');},700);}}
