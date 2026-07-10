@@ -1,4 +1,4 @@
-<!-- v37 build 20260709230049 -->
+<!-- v38 build 20260710042519 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -826,27 +826,7 @@ var ST=_ST;
 // P, AP, HL are computed lazily on first use inside gP(), gA(), gH()
 
 /* ── CSV MERGE ── */
-function mergeCsvData(){
-  try{
-    if(localStorage.getItem('csv_v1'))return;
-    if(typeof _C==='undefined')return;
-    var ei=new Set(P.map(function(p){return p.id;}));
-    var ea=new Set(P.map(function(p){return(p.a||'').toUpperCase();}));
-    var cu=JSON.parse(localStorage.getItem('lpc')||'[]');
-    var ca=new Set(cu.map(function(p){return(p.a||'').toUpperCase();}));
-    var added=0;
-    _C.forEach(function(p){
-      if(ei.has(p.i))return;
-      var addr=(p.a||'').toUpperCase();
-      if(ea.has(addr)||ca.has(addr))return;
-      cu.push({id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p||''),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:'',vtype:''});
-      added++;
-    });
-    localStorage.setItem('lpc',JSON.stringify(cu));
-    localStorage.setItem('csv_v1','1');
-    _props=null;
-  }catch(e){}
-}
+function mergeCsvData(){/* v38: superseded by runtime _C merge inside gP() */}
 
 /* ── STATE ── */
 const S={pg:'home',prev:'home',pid:null,cid:null,tid:null,fq:'',fst:'',fstr:'',cfq:'',gq:'',pgSz:40,
@@ -857,7 +837,20 @@ var _props=null,_ix=null,_appts=null,_hot=null,_contacts=null,_todos=null,_allCC
 /* ── DATA ── */
 function gP(){if(!_props){
   // Lazy map _P on first gP() call — avoids blocking at parse time
-  if(!_P_mapped) _P_mapped=_P.map(function(p){return{id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''};});
+  if(!_P_mapped){
+    _P_mapped=_P.map(function(p){return{id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''};});
+    /* v38: merge FULL database (_C, 5,700+ records) — previous merge crashed silently on undefined var */
+    if(typeof _C!=='undefined'){
+      var _key=function(a,n){return String(a||'').toUpperCase().replace(/\s+/g,' ').trim()+'|'+String(n||'').toUpperCase().replace(/\s+/g,' ').trim();};
+      var _seen=new Set(_P_mapped.map(function(p){return _key(p.a,p.n);}));
+      var _ids=new Set(_P_mapped.map(function(p){return p.id;}));
+      _C.forEach(function(p){
+        if(_ids.has(p.i))return;
+        var k=_key(p.a,p.n);if(_seen.has(k))return;_seen.add(k);
+        _P_mapped.push({id:p.i,a:p.a||'',s:p.s||'',n:p.n||'',p:fmtPh(p.p),e:p.e||'',no:p.x||'',status:p.t||'uncontacted',sb:p.b||'Melbourne',po:p.o||''});
+      });
+    }
+  }
   var P=_P_mapped;
   var ov=JSON.parse(localStorage.getItem('lp')||'{}');var cu=JSON.parse(localStorage.getItem('lpc')||'[]');_props=P.map(function(p){var d=ov[p.id];return d?Object.assign({},p,d):Object.assign({},p);});cu.forEach(function(c){if(!_props.find(function(x){return x.id===c.id;}))_props.push(c);});}return _props;}
 function sP(){
@@ -1335,7 +1328,7 @@ function rHome(){
         '<div class="nc-feed-icon" style="background:'+(colors[i.type]||'var(--bg3)')+'">'+(icons[i.type]||'📋')+'</div>' +
         '<div class="nc-feed-body">' +
           '<div class="nc-feed-name">'+(i.name||i.address||'Contact')+'</div>' +
-          '<div class="nc-feed-detail">'+(i.type||'activity').toUpperCase()+(i.outcome?' · '+i.outcome:'')+(i.notes?' · '+i.notes.substring(0,30):'')+'</div>' +
+          '<div class="nc-feed-detail">'+(i.type||'activity').toUpperCase()+(i.outcome?' · '+String(i.outcome).replace(/_/g,' '):'')+(i.phone?' · '+fmtPh(i.phone):'')+'</div>'+'<div class="nc-feed-detail" style="opacity:.75">'+d.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'</div>'+(i.notes?'<div class="nc-feed-detail" style="white-space:normal;opacity:.85">📝 '+String(i.notes).substring(0,90)+'</div>':'') +
         '</div>' +
         '<div class="nc-feed-time">'+agoStr+'</div>' +
       '</div>';
@@ -1370,6 +1363,57 @@ function rHome(){
 }
 
 
+
+/* v38: platform-correct SMS URL (iOS needs &body= , Android ?body=) */
+function smsUrl(ph,body){var p=String(ph||'').replace(/[^\d+]/g,'');var ios=/iPad|iPhone|iPod/.test(navigator.userAgent||'');return 'sms:'+p+(body?(ios?'&':'?')+'body='+encodeURIComponent(body):'');}
+
+/* v38: AUTO POST-CALL WORKFLOW — sheet appears when returning to app after a call */
+function markPending(ph,nm,ad,pid,session){window._pendingCall={ph:ph,nm:nm,ad:ad,pid:pid,session:!!session,ts:Date.now()};}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible')return;
+  var pc=window._pendingCall;if(!pc)return;
+  if(Date.now()-pc.ts<2500)return;
+  window._pendingCall=null;
+  setTimeout(function(){postCallM(pc);},300);
+});
+function postCallM(pc){
+  var m=$('mod');if(m)m.remove();
+  window._pc=pc;window._pcOc=null;
+  var fn=(pc.nm||'').split(' ')[0]||'there';
+  modal('<div class="sht"><div class="sht-h"></div>'+
+   '<div class="sht-hdr"><div><div class="sht-ttl">📞 How did it go?</div><div class="sht-sub">'+esc(pc.nm||pc.ad||'Contact')+(pc.ph?' · '+fmtPh(pc.ph):'')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div>'+
+   '<div class="sht-bd" style="display:flex;flex-direction:column;gap:12px">'+
+   '<div><div class="fl">Outcome</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+     [['interested','⭐ Interested'],['callback','🔄 Callback'],['appointment','📅 Booked'],['voicemail','📵 Voicemail'],['no_answer','🔕 No Answer'],['not_interested','✗ Not Interested']].map(function(o){
+       return '<button class="btn-ghost-sm pc-oc" onclick="pcPick(this,\''+o[0]+'\')" style="padding:11px">'+o[1]+'</button>';
+     }).join('')+
+   '</div></div>'+
+   '<div><div class="fl">Notes</div><textarea class="fta" id="pc-notes" placeholder="What did they say?" style="min-height:70px"></textarea></div>'+
+   '<div><div class="fl">Follow up</div><div style="display:flex;gap:8px">'+
+     (pc.ph?'<button class="btn-ghost-sm" style="flex:1" onclick="window.location.href=smsUrl(\''+esc(pc.ph)+'\',\'Hi '+esc(fn)+', great speaking with you just now. — Alex Doguluer, Luxe Properties Melbourne\')">💬 SMS</button>':'')+
+     '<button class="btn-ghost-sm" style="flex:1" onclick="pcEmail()">✉️ Email</button>'+
+     (pc.pid?'<button class="btn-ghost-sm" style="flex:1" onclick="togHot('+pc.pid+');toast(\'🔥 Added to Hot List\')">🔥 Hot</button>':'')+
+   '</div></div>'+
+   '<button onclick="pcSave()" style="width:100%;padding:14px;border:none;border-radius:12px;background:#C9A96E;color:#0A0A0A;font-weight:800;font-size:15px;cursor:pointer">'+(pc.session?'Save & Next Call ›':'Save')+'</button>'+
+   '</div></div>');
+}
+function pcPick(btn,oc){window._pcOc=oc;document.querySelectorAll('.pc-oc').forEach(function(b){b.style.background='';b.style.borderColor='';b.style.color='';});btn.style.background='#C9A96E';btn.style.borderColor='#C9A96E';btn.style.color='#0A0A0A';}
+function pcEmail(){var pc=window._pc||{};var e='';if(pc.pid){var p=gP().find(function(x){return x.id===pc.pid;});e=(p&&p.e)||'';}window.location.href='mailto:'+e+'?subject='+encodeURIComponent('Great speaking with you — Alex Doguluer, Luxe Properties Melbourne');}
+function pcSave(){
+  var pc=window._pc||{};var oc=window._pcOc||'connected';var nt=($('pc-notes')||{}).value||'';
+  gI().push({id:Date.now(),type:'call',propertyId:pc.pid||null,address:pc.ad||'',name:pc.nm||'',phone:pc.ph||'',outcome:oc,notes:nt,date:new Date().toISOString()});sI();
+  if(pc.pid){var p=gP().find(function(x){return x.id===pc.pid;});if(p){p.status=oc;p.lastContact=new Date().toISOString();sP();}}
+  toast('✅ Call logged');
+  var m=$('mod');if(m)m.remove();
+  if(pc.session){callNext();}else if(S.pg==='smart'){rSmart();}else{bdg();}
+}
+
+/* v38: SKIP + CALLED-TODAY tracking */
+function calledToday(){var t=new Date().toDateString();var ids=new Set();gI().forEach(function(i){if(i.type==='call'&&i.propertyId&&new Date(i.date).toDateString()===t)ids.add(i.propertyId);});return ids;}
+function gSkip(){try{var o=JSON.parse(localStorage.getItem('lp_skip')||'{}');if(o.d!==new Date().toDateString())return{d:new Date().toDateString(),ids:[]};return o;}catch(e){return{d:new Date().toDateString(),ids:[]};}}
+function skipSm(id){var o=gSkip();if(o.ids.indexOf(id)<0)o.ids.push(id);localStorage.setItem('lp_skip',JSON.stringify(o));toast('⏭ Skipped for today');rSmart();}
+function unskipAll(){localStorage.removeItem('lp_skip');rSmart();}
+
 /* ── v37: DAILY TARGETS ── */
 function gTarg(){var t={};try{t=JSON.parse(localStorage.getItem('lp_targets')||'{}');}catch(e){}return{calls:+t.calls||50,sms:+t.sms||20,appts:+t.appts||2};}
 function targetM(){var t=gTarg();modal('<div class="sht"><div class="sht-h"></div>'+
@@ -1390,7 +1434,7 @@ function startCalling(){
   var hotS=pp.filter(function(p){return p.isHot||hl.find(function(h){return h.a===p.a;});});
   var callL=pp.filter(function(p){return['callback','interested','voicemail','no_answer'].includes(p.status);});
   var all=[...new Map([...hotS,...callL].map(function(p){return[p.id,p];})).values()];
-  var arch=gSA();var active=all.filter(function(p){return!arch.includes(p.id)&&p.p;});
+  var arch=gSA();var ct=calledToday();var sk=new Set(gSkip().ids);var active=all.filter(function(p){return !arch.includes(p.id)&&p.p&&!ct.has(p.id)&&!sk.has(p.id);});
   var q=(S.smSel&&S.smSel.size>0)?active.filter(function(p){return S.smSel.has(p.id);}):active;
   if(!q.length){toast('No contacts with phone numbers to call');return;}
   window._cq=q;window._ci=0;callModeM();
@@ -1406,7 +1450,7 @@ function callModeM(){
   '<div style="font-size:18px;font-weight:800">'+esc(p.n||'Unknown')+'</div>'+
   '<div style="font-size:13px;color:var(--muted)">'+esc(p.a||'')+(p.sb?' · '+esc(p.sb):'')+'</div>'+
   '<span class="bdg '+bc(p.status)+'">'+((p.status||'new').replace(/_/g,' '))+'</span>'+
-  '<a href="tel:'+p.p+'" style="display:block;width:100%;padding:16px;border-radius:14px;background:#22C55E;color:#fff;font-weight:800;font-size:16px;text-decoration:none">📞 Call '+fmtPh(p.p)+'</a>'+
+  '<a href="tel:'+p.p+'" onclick="markPending(\''+esc(p.p)+'\',\''+esc(p.n||'')+'\',\''+esc(p.a||'')+'\','+p.id+',true)" style="display:block;width:100%;padding:16px;border-radius:14px;background:#22C55E;color:#fff;font-weight:800;font-size:16px;text-decoration:none">📞 Call '+fmtPh(p.p)+'</a>'+
   '<div style="width:100%;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left">Log outcome & next</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">'+
   '<button class="btn-ghost-sm" onclick="smOutcome('+p.id+',\'interested\')" style="padding:12px">✅ Interested</button>'+
@@ -1444,32 +1488,42 @@ function rSmart(){
   var hotS=pp.filter(function(p){return p.isHot||hl.find(function(h){return h.a===p.a;});});
   var callL=pp.filter(function(p){return['callback','interested','voicemail','no_answer'].includes(p.status);});
   var all=[...new Map([...hotS,...callL].map(function(p){return[p.id,p];})).values()];
-  var arch=gSA();var active=all.filter(function(p){return!arch.includes(p.id);});
+  var arch=gSA();
+  var ct=calledToday();var sk=new Set(gSkip().ids);
+  var pool=all.filter(function(p){return!arch.includes(p.id);});
+  var doneToday=pool.filter(function(p){return ct.has(p.id);});
+  var skipped=pool.filter(function(p){return sk.has(p.id)&&!ct.has(p.id);});
+  var active=pool.filter(function(p){return!ct.has(p.id)&&!sk.has(p.id);});
   var sel=S.smSel;
-  var todCalls=gI().filter(function(i){return new Date(i.date).toDateString()===new Date().toDateString()&&i.type==='call';}).length;
-  var target=gTarg().calls;var pct=Math.min(100,Math.round(todCalls/target*100));
-
+  var T=gTarg();
+  var tod=new Date().toDateString();
+  var todCalls=gI().filter(function(i){return new Date(i.date).toDateString()===tod&&i.type==='call';}).length;
+  var todSms=gI().filter(function(i){return new Date(i.date).toDateString()===tod&&i.type==='sms';}).length;
+  var target=T.calls;var pct=Math.min(100,Math.round(todCalls/Math.max(1,target)*100));
+  var alts=gSaAlts().filter(function(a){return !a.archived;});
   $('scr').innerHTML=
-  '<div class="smart-hdr">'+
-    '<div class="smart-hdr-title">Smart Call List</div>'+
-    '<div class="smart-hdr-sub">'+active.length+' priority leads · tap to call · swipe to archive</div>'+
-    '<div class="call-progress-wrap">'+
-      '<div class="call-progress-bar-bg"><div class="call-progress-bar-fill" style="width:'+pct+'%"></div></div>'+
-      '<div class="call-progress-label">Today\'s calls: <strong>'+todCalls+' / '+target+'</strong> <span onclick="targetM()" style="cursor:pointer;opacity:.85;margin-left:6px;text-decoration:underline">⚙️ targets</span></div>'+
+  '<div style="background:linear-gradient(150deg,#0A0A0A 0%,#1E1B16 100%);padding:18px 16px 16px;color:#fff">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between">'+
+      '<div><div style="font-family:\'Cormorant Garamond\',serif;font-size:24px;font-weight:600;letter-spacing:.5px;color:#C9A96E">Smart Calls</div>'+
+      '<div style="font-size:12px;opacity:.75;margin-top:2px">'+active.length+' to call · '+doneToday.length+' done today</div></div>'+
+      '<button onclick="targetM()" style="background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.4);color:#C9A96E;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">🎯 '+todCalls+'/'+target+'</button>'+
     '</div>'+
+    '<div style="height:6px;border-radius:3px;background:rgba(255,255,255,.12);margin:12px 0 5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#C9A96E,#E5CFA5);border-radius:3px;transition:width .3s"></div></div>'+
+    '<div style="display:flex;justify-content:space-between;font-size:10.5px;opacity:.65"><span>📞 '+todCalls+'/'+T.calls+' calls</span><span>💬 '+todSms+'/'+T.sms+' SMS</span><span>'+pct+'% of target</span></div>'+
+    '<button onclick="startCalling()" style="width:100%;margin-top:14px;padding:15px;border:none;border-radius:13px;background:#C9A96E;color:#0A0A0A;font-weight:800;font-size:15.5px;cursor:pointer">▶ Start Calling'+(sel.size>0?' ('+sel.size+' selected)':' ('+active.length+')')+'</button>'+
   '</div>'+
   '<div class="smart-toolbar">'+
-    '<button class="btn-teal-sm" onclick="startCalling()" style="font-weight:800">▶ Start Calling</button>'+
     '<button class="btn-ghost-sm" onclick="smSelAll()">'+( sel.size===active.length&&active.length>0?'Deselect All':'☑ Select All')+'</button>'+
     (sel.size>0&&sel.size<active.length?'<button class="btn-ghost-sm" onclick="smDeselAll()">✕ Clear</button>':'')+
     '<div style="flex:1"></div>'+
-    (sel.size>0?'<button class="btn-teal-sm" onclick="smBulkSMS()">💬 SMS '+sel.size+'</button><button class="btn-ghost-sm" onclick="smBulkArch()">📦</button>':'<span style="font-size:12px;color:var(--muted)">Tick contacts to bulk action</span>')+
+    (sel.size>0?'<button class="btn-teal-sm" onclick="smBulkSMS()">💬 SMS '+sel.size+'</button><button class="btn-ghost-sm" onclick="smBulkArch()">📦</button>':'<span style="font-size:12px;color:var(--muted)">Tick contacts for bulk SMS</span>')+
   '</div>'+
-  // RECENT SALES ALERTS
-  renderSaleAlerts()+
-  '<div class="sticky-hdr">PRIORITY CALLS — '+active.length+'</div>'+
-  (active.length===0?'<div class="empty"><div class="empty-i">📞</div><div class="empty-t">No priority calls</div><div class="empty-s">Hot List + Interested + Callback contacts appear here</div></div>'
+  (alts.length?'<div style="padding:8px 14px;background:var(--card);border-bottom:1px solid var(--border)"><button class="btn-ghost-sm" style="width:100%;justify-content:center" onclick="window._saShow=!window._saShow;rSmart()">🏡 Recent Area Activity ('+alts.length+') '+(window._saShow?'▲ hide':'▼ show')+'</button></div>'+(window._saShow?renderSaleAlerts():''):'')+
+  '<div class="sticky-hdr">📞 PRIORITY CALLS — '+active.length+'</div>'+
+  (active.length===0?'<div class="empty"><div class="empty-i">'+(doneToday.length?'🎉':'📞')+'</div><div class="empty-t">'+(doneToday.length?'All done for today!':'No priority calls')+'</div><div class="empty-s">Hot List + Interested + Callback contacts appear here</div></div>'
     :active.map(function(p){return smRow(p,false);}).join(''))+
+  (doneToday.length?'<div class="sticky-hdr" style="margin-top:6px;opacity:.65">✅ CALLED TODAY — '+doneToday.length+'</div><div style="opacity:.55">'+doneToday.map(function(p){return smRow(p,false);}).join('')+'</div>':'')+
+  (skipped.length?'<div class="sticky-hdr" style="margin-top:6px;opacity:.65;display:flex;justify-content:space-between"><span>⏭ SKIPPED — '+skipped.length+'</span><span onclick="unskipAll()" style="cursor:pointer;text-decoration:underline;font-weight:600">Restore</span></div><div style="opacity:.55">'+skipped.map(function(p){return smRow(p,false);}).join('')+'</div>':'')+
   (gSA().length?'<div class="sticky-hdr" style="opacity:.5;margin-top:6px">ARCHIVED — '+all.filter(function(p){return gSA().includes(p.id);}).length+'</div><div style="opacity:.45">'+all.filter(function(p){return gSA().includes(p.id);}).map(function(p){return smRow(p,true);}).join('')+'</div>':'')+
   '<div style="height:80px"></div>';
   setTimeout(swipes,80);
@@ -1524,7 +1578,7 @@ function renderSaleAlerts(){
       return '<div class="sw" id="swalt'+idx+'">'+
         '<div class="sw-acts">'+
           (a.ownerPhone?'<div class="sa sa-gn" onclick="window.location.href=\'tel:'+a.ownerPhone+'\'"><span>📞</span>Call</div>':'')+ 
-          (a.ownerPhone?'<div class="sa sa-bl" onclick="window.open(\'sms:'+a.ownerPhone+'?body=Hi+'+encodeURIComponent((a.ownerName||'').split(' ')[0]||'there')+'\')"><span>💬</span>SMS</div>':'')+
+          (a.ownerPhone?'<div class="sa sa-bl" onclick="window.location.href=smsUrl(\''+a.ownerPhone+'\',\'Hi '+((a.ownerName||'').split(' ')[0]||'there')+'\')"><span>💬</span>SMS</div>':'')+
           '<div class="sa sa-gr" onclick="archAlt('+idx+')"><span>📦</span>Archive</div>'+
         '</div>'+
         '<div class="sale-alert-row row" id="saltr'+idx+'" onclick="showAltNearby(\''+esc(a.street)+'\',\''+esc(a.addr)+'\')" style="cursor:pointer">'+
@@ -1596,7 +1650,7 @@ function smRow(p,isA){
       '<div class="sa sa-gn" onclick="callM(\''+esc(p.p)+'\',\''+esc(p.n)+'\',\''+esc(p.a)+'\','+p.id+')"><span>📞</span>Call</div>'+
       '<div class="sa sa-bl" onclick="S.smSel=new Set(['+p.id+']);smBulkSMS()"><span>💬</span>SMS</div>'+
       '<div class="sa sa-gd" onclick="togHot('+p.id+');rSmart()"><span>🔥</span>Hot</div>'+
-      '<div class="sa sa-gr" onclick="archSm('+p.id+')"><span>'+(isA?'↩️':'📦')+'</span>'+(isA?'Restore':'Archive')+'</div>'+
+      (isA?'':'<div class="sa sa-or" onclick="skipSm('+p.id+')"><span>⏭</span>Skip</div>')+'<div class="sa sa-gr" onclick="archSm('+p.id+')"><span>'+(isA?'↩️':'📦')+'</span>'+(isA?'Restore':'Archive')+'</div>'+
     '</div>'+
     '<div class="row" id="swr'+p.id+'">'+
       '<div class="bkc'+(chk?' on':'')+'" onclick="togSmSel('+p.id+')">'+(chk?'✓':'')+'</div>'+
@@ -2546,7 +2600,7 @@ function sendApptSMS(aid){
   if(!ph){toast('No phone number');return;}
   var ta=document.getElementById('asms');
   var msg=ta?ta.value:(window._apptTemplates&&window._apptTemplates[0]?window._apptTemplates[0].t:'');
-  window.open('sms:'+ph+'?body='+encodeURIComponent(msg),'_self');
+  window.location.href=smsUrl(ph,msg);
   gI().push({id:Date.now(),type:'sms',address:a.a||a.address||'',name:a.n||a.name||'',phone:ph,outcome:'sent',notes:msg.substring(0,120),date:new Date().toISOString()});
   sI();
   cls();
@@ -2876,7 +2930,10 @@ function rLog(){
       html+='<div class="log-body" style="touch-action:manipulation" onclick="'+(ix.propertyId?'oProp('+ix.propertyId+')':'')+'">';
       html+='<div class="log-ico">'+(TI[ix.type]||'📋')+'</div>';
       html+='<div style="flex:1;min-width:0">';
-      html+='<div class="rt" style="font-size:13.5px">'+((ix.address||ix.name)||'Unknown')+'</div>';
+      html+='<div class="rt" style="font-size:13.5px">'+(ix.name||ix.address||'Unknown')+(ix.phone?' <span style="font-weight:500;color:var(--muted);font-size:12px">· '+fmtPh(ix.phone)+'</span>':'')+'</div>';
+      if(ix.name&&ix.address)html+='<div class="rs" style="font-size:11.5px">'+ix.address+'</div>';
+      html+='<div class="rs" style="font-size:11px;color:var(--dim)">'+new Date(ix.date).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})+' · '+new Date(ix.date).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'</div>';
+      if(ix.notes)html+='<div class="rs" style="font-size:11.5px;white-space:normal;margin-top:2px">📝 '+esc(String(ix.notes)).substring(0,140)+'</div>';
       html+='<div class="rm"><span class="bdg '+bc(ix.outcome)+'" style="font-size:10px">'+(ix.outcome||ix.type).replace(/_/g,' ')+'</span>';
       html+='<span class="rtime">'+ago(ix.date)+'</span>';
       html+=(ph?'<span style="font-family:monospace;font-size:10.5px;color:var(--dim)">'+ph+'</span>':'');
@@ -3213,11 +3270,11 @@ function pickTpl(i){
   }
 }
 
-/* duplicate bkSelAll removed v37 */
-/* duplicate togBk removed v37 */
+/* duplicate bkSelAll removed v38 */
+/* duplicate togBk removed v38 */
 var _bQ=[],_bI=0,_bMsg='';
 function startBulk(){var ov=window._bkOv,awp=gP().filter(function(p){return!p.archived&&p.p;});var pool=ov?ov:(S.bkStr?awp.filter(function(p){return p.s===S.bkStr;}):awp);var send=S.bkSel.size>0?pool.filter(function(p){return S.bkSel.has(p.id);}):pool;if(!send.length){toast('No contacts to send to');return;}_bMsg=window._bkMsg||TMPLS[window._bkTi||0].m;_bQ=send;_bI=0;nxtBulk();}
-function nxtBulk(){if(_bI>=_bQ.length){toast('✅ All '+_bQ.length+' SMS complete');S.bkSel=new Set();window._bkOv=null;return;}var p=_bQ[_bI];var msg=_bMsg.replace(/\[Name\]/g,(p.n||'there').split(' ')[0]).replace(/\[Address\]/g,p.a||'').replace(/\[Street\]/g,p.s||'').replace(/\[Suburb\]/g,p.sb||'');window.open('sms:'+p.p+'?body='+encodeURIComponent(msg),'_self');gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a,name:p.n,phone:p.p,outcome:'sent',notes:msg.substring(0,80),date:new Date().toISOString()});sI();_bI++;if(_bI<_bQ.length){setTimeout(function(){if(confirm('SMS '+_bI+'/'+_bQ.length+' sent.\n\nNext: '+(_bQ[_bI].n||'?')+' — '+_bQ[_bI].p+'\n\nSend next?'))nxtBulk();else toast('Paused at '+_bI);},1200);}else{setTimeout(function(){toast('✅ All '+_bQ.length+' SMS sent');},700);}}
+function nxtBulk(){if(_bI>=_bQ.length){toast('✅ All '+_bQ.length+' SMS complete');S.bkSel=new Set();window._bkOv=null;return;}var p=_bQ[_bI];var msg=_bMsg.replace(/\[Name\]/g,(p.n||'there').split(' ')[0]).replace(/\[Address\]/g,p.a||'').replace(/\[Street\]/g,p.s||'').replace(/\[Suburb\]/g,p.sb||'');window.location.href=smsUrl(p.p,msg);gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a,name:p.n,phone:p.p,outcome:'sent',notes:msg.substring(0,80),date:new Date().toISOString()});sI();_bI++;if(_bI<_bQ.length){setTimeout(function(){if(confirm('SMS '+_bI+'/'+_bQ.length+' sent.\n\nNext: '+(_bQ[_bI].n||'?')+' — '+_bQ[_bI].p+'\n\nSend next?'))nxtBulk();else toast('Paused at '+_bI);},1200);}else{setTimeout(function(){toast('✅ All '+_bQ.length+' SMS sent');},700);}}
 
 
 /* ── BUYERS DATA ── */
@@ -3356,7 +3413,7 @@ function delBuyer(id){if(!confirm('Delete buyer?'))return;_buyers=gB().filter(fu
 function buyerSMS(id){
   var b=gB().find(function(x){return x.id===id;});if(!b||!b.phone){toast('No phone number');return;}
   var msg='Hi '+((b.name||'').split(' ')[0]||'there')+', this is Alex from Luxe Properties Melbourne — '+AGENT_MOBILE.replace(/^(\d{4})(\d{3})(\d{3})$/,'$1 $2 $3')+'. I wanted to follow up regarding your property enquiry. Please feel free to contact me anytime.';
-  window.open('sms:'+b.phone+'?body='+encodeURIComponent(msg),'_self');
+  window.location.href=smsUrl(b.phone,msg);
   gI().push({id:Date.now(),type:'sms',name:b.name,phone:b.phone,outcome:'sent',notes:'Buyer SMS',date:new Date().toISOString()});sI();
   toast('💬 SMS logged');
 }
@@ -3438,7 +3495,7 @@ function listingSMS(id){
   var l=gLS().find(function(x){return x.id===id;});if(!l||!l.phone){toast('No phone');return;}
   var fn=(l.vendor||'').split(' ')[0]||'there';
   var msg='Hi '+fn+', this is Alex from Luxe Properties Melbourne. Just reaching out with an update on your property campaign at '+l.address+'. Please feel free to call me anytime on 0434 342 390.';
-  window.open('sms:'+l.phone+'?body='+encodeURIComponent(msg),'_self');
+  window.location.href=smsUrl(l.phone,msg);
   gI().push({id:Date.now(),type:'sms',name:l.vendor,phone:l.phone,outcome:'sent',notes:'Listing vendor SMS',date:new Date().toISOString()});sI();toast('💬 SMS logged');
 }
 
@@ -3928,7 +3985,7 @@ function bkSendNext(){
   var msg=(window._bkMsg||(TMPLS[window._bkTi||0]?TMPLS[window._bkTi||0].m||'':''));
   var fn=(p.n||'').split(' ')[0]||'there';
   var personalised=msg.replace(/\[Name\]/g,fn).replace(/\[Street\]/g,p.s||'').replace(/\[Suburb\]/g,p.sb||'Melbourne').replace(/\[Address\]/g,p.a||'').replace(/\[Agent\]/g,'Alex');
-  window.open('sms:'+p.p+'?body='+encodeURIComponent(personalised),'_self');
+  window.location.href=smsUrl(p.p,personalised);
   gI().push({id:Date.now()+Math.random(),type:'sms',name:p.n,phone:p.p,address:p.a,propertyId:p.id,outcome:'sent',notes:'Bulk SMS',date:new Date().toISOString()});
   sI();
   toast('💬 '+(i+1)+'/'+q.length+' — '+(p.n||p.p));
@@ -4138,7 +4195,7 @@ function togHot(id){
 }
 
 /* ── CALL MODAL ── */
-function callM(ph,nm,ad,pid){ph=fmtPh(($('call-ph')&&$('call-ph').value)||ph)||ph;modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">📞 Log Call</div><div class="sht-sub">'+(ad||nm||'')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg" style="margin-bottom:12px"><div class="fl">Phone Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim)">— tap to edit</span></div><div style="display:flex;gap:8px;align-items:center"><input class="fi" id="call-ph" type="tel" value="'+(ph||'')+'" placeholder="04XX XXX XXX" style="flex:1;font-size:17px;font-weight:600" oninput="var d=document.getElementById(\'call-dial\');if(d)d.href=\'tel:\'+this.value">'+(ph?'<a id="call-dial" href="tel:'+ph+'" class="btn btn-gn btn-sm" style="flex-shrink:0;text-decoration:none;white-space:nowrap">📞 Call</a>':'<a id="call-dial" href="tel:" class="btn btn-gn btn-sm" style="flex-shrink:0;text-decoration:none;white-space:nowrap;opacity:.4">📞 Call</a>')+'</div></div>'+(!ph?'<div style="background:var(--ambg);border:1px solid var(--amber);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:12px">⚠️ No phone on file — enter above</div>':'')+'<div class="fg"><div class="fl">Outcome</div><div class="oc-g">'+'[["voicemail","📵","Voicemail"],["no_answer","🔕","No Answer"],["connected","✅","Connected"],["interested","⭐","Interested"],["not_interested","✗","Not Int."],["callback","🔄","Callback"],["appointment","📅","Booked"],["hung_up","📴","Hung Up"],["wrong_number","❌","Wrong No."]]'.split('],[').map(function(x){var f=x.replace(/^\[|\]$/g,'').split(',');var v=f[0].replace(/"/g,''),ic=f[1].replace(/"/g,''),lb=f[2].replace(/"/g,'');return'<div class="oc'+(v==='voicemail'?' on':'')+'" id="oc'+v+'" onclick="pickOc(\''+v+'\')"><span class="oc-i">'+ic+'</span><span class="oc-l">'+lb+'</span></div>';}).join('')+'</div></div><div class="fg"><div class="fl">Notes</div><textarea class="fta" id="cn" placeholder="What did they say?" style="min-height:80px"></textarea></div><div class="fg"><div class="fl">Next Action</div><input class="fi" id="cnx" placeholder="e.g. Call back in 2 weeks…"></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveCall(\''+esc(ph||'')+'\',\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Save</button></div></div>');window._oc='voicemail';}
+function callM(ph,nm,ad,pid){ph=fmtPh(($('call-ph')&&$('call-ph').value)||ph)||ph;modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">📞 Log Call</div><div class="sht-sub">'+(ad||nm||'')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg" style="margin-bottom:12px"><div class="fl">Phone Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim)">— tap to edit</span></div><div style="display:flex;gap:8px;align-items:center"><input class="fi" id="call-ph" type="tel" value="'+(ph||'')+'" placeholder="04XX XXX XXX" style="flex:1;font-size:17px;font-weight:600" oninput="var d=document.getElementById(\'call-dial\');if(d)d.href=\'tel:\'+this.value">'+(ph?'<a id="call-dial" href="tel:'+ph+'" onclick="markPending(\''+esc(ph)+'\',\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+',false)" class="btn btn-gn btn-sm" style="flex-shrink:0;text-decoration:none;white-space:nowrap">📞 Call</a>':'<a id="call-dial" href="tel:" class="btn btn-gn btn-sm" style="flex-shrink:0;text-decoration:none;white-space:nowrap;opacity:.4">📞 Call</a>')+'</div></div>'+(!ph?'<div style="background:var(--ambg);border:1px solid var(--amber);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:12px">⚠️ No phone on file — enter above</div>':'')+'<div class="fg"><div class="fl">Outcome</div><div class="oc-g">'+'[["voicemail","📵","Voicemail"],["no_answer","🔕","No Answer"],["connected","✅","Connected"],["interested","⭐","Interested"],["not_interested","✗","Not Int."],["callback","🔄","Callback"],["appointment","📅","Booked"],["hung_up","📴","Hung Up"],["wrong_number","❌","Wrong No."]]'.split('],[').map(function(x){var f=x.replace(/^\[|\]$/g,'').split(',');var v=f[0].replace(/"/g,''),ic=f[1].replace(/"/g,''),lb=f[2].replace(/"/g,'');return'<div class="oc'+(v==='voicemail'?' on':'')+'" id="oc'+v+'" onclick="pickOc(\''+v+'\')"><span class="oc-i">'+ic+'</span><span class="oc-l">'+lb+'</span></div>';}).join('')+'</div></div><div class="fg"><div class="fl">Notes</div><textarea class="fta" id="cn" placeholder="What did they say?" style="min-height:80px"></textarea></div><div class="fg"><div class="fl">Next Action</div><input class="fi" id="cnx" placeholder="e.g. Call back in 2 weeks…"></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveCall(\''+esc(ph||'')+'\',\''+esc(nm||'')+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Save</button></div></div>');window._oc='voicemail';}
 window.pickOc=function(v){document.querySelectorAll('.oc').forEach(function(e){e.classList.remove('on');});var e=$('oc'+v);if(e)e.classList.add('on');window._oc=v;};
 function saveCall(ph,nm,ad,pid){var realPh=fmtPh(($('call-ph')&&$('call-ph').value)||ph)||ph;var oc=window._oc||'voicemail',nt=$('cn').value,nx=$('cnx').value;gI().push({id:Date.now(),type:'call',propertyId:pid,address:ad,name:nm,phone:realPh,outcome:oc,notes:nt+(nx?'\nNext: '+nx:''),date:new Date().toISOString()});sI();if(pid){
     var p=gP().find(function(x){return x.id===pid;});
@@ -4168,7 +4225,7 @@ function saveCall(ph,nm,ad,pid){var realPh=fmtPh(($('call-ph')&&$('call-ph').val
 
 /* ── SMS ── */
 function smsM(ph,nm,ad,pid){var fn=(nm||'').split(' ')[0]||'there';var ts=TMPLS.map(function(t){return Object.assign({},t,{t:t.t.replace(/\[Name\]/g,fn).replace(/\[Address\]/g,ad||'').replace(/\[Street\]/g,'').replace(/\[Suburb\]/g,'')});});modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">💬 SMS</div><div class="sht-sub">'+(nm||'Owner')+' · '+(ph||'No phone')+'</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Template</div>'+ts.map(function(t,i){return'<div class="tc'+(i===0?' on':'')+'" id="st'+i+'" onclick="pickT('+i+')"><div class="tr">'+(i===0?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'')+'</div><div style="flex:1;min-width:0"><div class="tc-n">'+t.l+'</div><div class="tc-p">'+t.t.substring(0,65)+'…</div></div></div>';}).join('')+'</div><div class="fg"><div class="fl">Message <span id="slen" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px"></span></div><textarea class="fta" id="smst" style="min-height:120px" oninput="window._sm=this.value;$$(\'slen\').textContent=this.value.length+\' chars\'">'+(ts[0].t)+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+(ph?'<a class="btn btn-gd" id="smsl" href="sms:'+ph+'?body='+encodeURIComponent(ts[0].t)+'" onclick="logSMS(\''+esc(ph)+'\',\''+esc(nm)+'\',\''+esc(ad||'')+'\','+(pid||'null')+')">Open Messages →</a>':'<button class="btn btn-gd" disabled style="opacity:.35">No phone</button>')+'</div></div>');window._smTs=ts;window._smPh=ph;$('slen').textContent=ts[0].t.length+' chars';}
-window.pickT=function(i){document.querySelectorAll('.tc').forEach(function(e,j){e.classList.toggle('on',j===i);e.querySelector('.tr').innerHTML=j===i?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'';});var t=$('smst');if(t){t.value=window._smTs[i].t;t.dispatchEvent(new Event('input'));}var l=$('smsl');if(l)l.href='sms:'+window._smPh+'?body='+encodeURIComponent(window._smTs[i].t);};
+window.pickT=function(i){document.querySelectorAll('.tc').forEach(function(e,j){e.classList.toggle('on',j===i);e.querySelector('.tr').innerHTML=j===i?'<span style="color:#000;font-size:11px;font-weight:900">✓</span>':'';});var t=$('smst');if(t){t.value=window._smTs[i].t;t.dispatchEvent(new Event('input'));}var l=$('smsl');if(l)l.href=smsUrl(window._smPh,window._smTs[i].t);};
 function logSMS(ph,nm,ad,pid){var t=($('smst')||{}).value||'';gI().push({id:Date.now(),type:'sms',propertyId:pid,address:ad,name:nm,phone:ph,outcome:'sent',notes:t.substring(0,120),date:new Date().toISOString()});sI();cls();toast('SMS opened');bdg();}
 
 /* ── EMAIL ── */
