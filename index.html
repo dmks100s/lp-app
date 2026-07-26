@@ -692,14 +692,28 @@ input[type=date],input[type=time]{color-scheme:light dark;}
 .qa-chip span{font-size:14px;}
 .section-hdr-sub{font-size:10px;color:var(--muted);padding:4px 14px 0;text-transform:uppercase;letter-spacing:.8px;}
 
-/* PERFORMANCE — content-visibility for offscreen rows */
-#cl .sw, #pl .sw, #scr .sw{content-visibility:auto;contain-intrinsic-size:0 56px;}
 /* Prevent layout recalculation on transform */
 .row,.log-row,.bki,.nc-appt-row{will-change:transform;}
 /* Fast tap response */
 .tab,.btn,.ibt,.qa-chip,.nc-qa-btn,.chip,.bkc,.bki,.row,.row-in,.sw{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 /* Smooth scroll */
 #scr{scroll-behavior:auto;} /* auto is faster than smooth for programmatic */
+
+.smart-hdr{background:linear-gradient(135deg,#0F172A,#1E3A5F);padding:14px;position:relative;overflow:hidden;}
+.smart-hdr::before{content:'';position:absolute;top:-20%;right:-10%;width:180px;height:180px;background:radial-gradient(circle,rgba(14,165,160,.15),transparent 65%);pointer-events:none;}
+.smart-hdr-title{font-size:17px;font-weight:800;color:#fff;}
+.smart-hdr-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;}
+.call-progress-wrap{margin-top:10px;}
+.call-progress-bar-bg{height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin-bottom:4px;}
+.call-progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:3px;transition:width .6s;}
+.call-progress-label{font-size:11px;color:rgba(255,255,255,.45);display:flex;align-items:center;justify-content:space-between;}
+.smart-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+.smart-toolbar::-webkit-scrollbar{display:none;}
+.btn-ghost-sm{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;touch-action:manipulation;white-space:nowrap;font-family:var(--f);}
+.b-ht{background:var(--rdbg);color:var(--red);padding:2px 7px;border-radius:6px;font-size:9px;font-weight:800;letter-spacing:.3px;}
+.b-pl{background:var(--gdbg);color:var(--gold);padding:2px 7px;border-radius:6px;font-size:9px;font-weight:800;}
+.b-it{background:var(--gnbg);color:var(--green);padding:2px 7px;border-radius:6px;font-size:9px;font-weight:800;}
+.b-vm{background:var(--blbg);color:var(--blue);padding:2px 7px;border-radius:6px;font-size:9px;font-weight:800;}
 </style>
 </head>
 <body class="light">
@@ -719,16 +733,11 @@ input[type=date],input[type=time]{color-scheme:light dark;}
     </div>
   </div>
   <div id="tabs">
-    <div class="tab on" id="t-home" onclick="go('home')"><div class="tab-i">🏠</div><div class="tab-t">Home</div></div>
-    <div class="tab" id="t-smart" onclick="go('smart')"><div class="tab-i">📞</div><div class="tab-t">Prospecting</div><div class="dot gd" id="bd-smart" style="display:none"></div></div>
-    <div class="tab" id="t-props" onclick="go('props')"><div class="tab-i">⌂</div><div class="tab-t">Properties</div></div>
-    <div class="tab" id="t-contacts" onclick="go('contacts')"><div class="tab-i">👤</div><div class="tab-t">Contacts</div></div>
-    <div class="tab" id="t-more" onclick="moreMenu()"><div class="tab-i">☰</div><div class="tab-t">More</div><div class="dot" id="bd-appt" style="display:none"></div></div>
-    
-    
-    
-    
-    
+    <div class="tab on" id="t-home" onclick="go('home')" style="touch-action:manipulation"><div class="tab-i">🏠</div><div class="tab-t">Home</div></div>
+    <div class="tab" id="t-smart" onclick="go('smart')" style="touch-action:manipulation"><div class="tab-i">📞</div><div class="tab-t">Calls</div><div class="dot rd" id="bd-smart" style="display:none"></div></div>
+    <div class="tab" id="t-props" onclick="go('props')" style="touch-action:manipulation"><div class="tab-i">🏘️</div><div class="tab-t">Properties</div></div>
+    <div class="tab" id="t-bulk" onclick="go('bulk')" style="touch-action:manipulation"><div class="tab-i">💬</div><div class="tab-t">Bulk SMS</div></div>
+    <div class="tab" id="t-more" onclick="showMoreNav()" style="touch-action:manipulation"><div class="tab-i">⋯</div><div class="tab-t">More</div></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -2365,7 +2374,7 @@ function cRow(c){
   '</div>';
 }
 
-function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+avUrl+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class="det-act-btn bl" onclick="smsM(\''+esc(c.phone||'')+'\',\''+esc(c.name)+'\',\'\',null)">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
+function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+''+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class="det-act-btn bl" onclick="smsM(\''+esc(c.phone||'')+'\',\''+esc(c.name)+'\',\'\',null)">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
 function editCM(id){var c=gC().find(function(x){return x.id===id;})||{};modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">✏️ Edit Contact</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Name</div><input class="fi" id="ecn" value="'+esc(c.name||'')+'"></div><div class="fg"><div class="fl">Phone</div><input class="fi" id="ecp" type="tel" value="'+(c.phone||'')+'"></div><div class="fg"><div class="fl">Email</div><input class="fi" id="ece" type="email" value="'+(c.email||'')+'"></div><div class="fg"><div class="fl">Address</div><input class="fi" id="eca" value="'+esc(c.address||'')+'"></div><div class="fg"><div class="fl">Notes</div><textarea class="fta" id="ecno" style="min-height:70px">'+(c.notes||'')+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveCM(\''+id+'\')">Save</button></div></div>');}
 function saveCM(id){var cs=gC();var c=cs.find(function(x){return x.id===id;});if(!c){c={id:id};cs.push(c);}c.name=$('ecn').value;c.phone=fmtPh($('ecp').value);c.email=$('ece').value;c.address=$('eca').value;c.notes=$('ecno').value;sC();cls();toast('Saved ✓');if(S.pg==='cdet')rCDet();else rContacts();}
 function delC(id){_contacts=gC().filter(function(c){return c.id!==id;});sC();toast('Deleted');go('contacts',true);}
@@ -4106,6 +4115,50 @@ function doBulkEmail(){
   window.open('mailto:'+emails+'?subject='+encodeURIComponent(s)+'&body='+encodeURIComponent(b.replace(/\[Name\]/g,'there')),'_self');
   pool.forEach(function(p){gI().push({id:Date.now()+Math.random(),type:'email',name:p.n,address:p.a,propertyId:p.id,outcome:'sent',notes:'Bulk email: '+s,date:new Date().toISOString()});});
   sI();cls();toast('✉️ Email opened');
+}
+
+function goF(status,str){S.fst=status||'';S.fstr=str||'';S.fq='';go('props');}
+
+function getDailyTarget(){return parseInt(localStorage.getItem('daily_target')||'50');}
+function showTargetSettings(){
+  var cur=getDailyTarget();
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div class="sht-ttl">🎯 Daily Call Target</div><button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div class="sht-bd">'+
+      '<div class="fg"><div class="fl">Calls per day</div>'+
+        '<input class="fi" id="dt-c" type="number" value="'+cur+'" min="1" max="200" style="font-size:24px;font-weight:800;text-align:center">'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
+        [20,30,50,75,100,150].map(function(n){return'<div onclick="document.getElementById(\'dt-c\').value='+n+'" style="padding:10px;background:var(--card);border:1.5px solid '+(n===cur?'var(--teal)':'var(--border)')+';border-radius:10px;text-align:center;cursor:pointer;touch-action:manipulation"><div style="font-size:18px;font-weight:800;color:'+(n===cur?'var(--teal)':'var(--text)')+'">'+n+'</div><div style="font-size:10px;color:var(--muted)">calls</div></div>';}).join('')+
+      '</div>'+
+    '</div>'+
+    '<div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button>'+
+    '<button class="btn btn-tl" style="flex:2;touch-action:manipulation" onclick="var v=parseInt((document.getElementById(\'dt-c\')||{value:\'50\'}).value)||50;localStorage.setItem(\'daily_target\',v);cls();toast(\'🎯 Target: \'+v+\' calls\');if(S.pg===\'smart\')rSmart();">Save</button></div>'+
+  '</div>');
+}
+
+
+function showMoreNav(){
+  modal('<div class="sht"><div class="sht-h"></div>'+
+    '<div class="sht-hdr"><div class="sht-ttl">More Sections</div><button class="sht-x" onclick="cls()">✕</button></div>'+
+    '<div class="sht-bd" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+    [['📋','Call Log','log'],['🔥','Hot List','hot'],['📅','Appraisals','appt'],
+     ['⭐','Interested','int'],['👤','Contacts','contacts'],['🔍','Search','search'],
+     ['✅','To Do','todo'],['🎯','Set Target','target'],['📱','Google Sync','gsync'],
+     ['☁️','Cloud Sync','csync'],['🌙','Dark Mode','theme'],['📊','Listings','listings']
+    ].map(function(x){
+      var fn=x[2]==='int'?"cls();S.fst='interested';go('props')" :
+             x[2]==='target'?"cls();showTargetSettings()" :
+             x[2]==='gsync'?"cls();showGoogleContactsSync()" :
+             x[2]==='csync'?"cls();showSupabaseSetup()" :
+             x[2]==='theme'?"cls();toggleTheme()" :
+             "cls();go('"+x[2]+"')";
+      return '<div onclick="'+fn+'" style="padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;text-align:center;cursor:pointer;touch-action:manipulation">'+
+        '<div style="font-size:22px;margin-bottom:4px">'+x[0]+'</div>'+
+        '<div style="font-size:12px;font-weight:700;color:var(--text)">'+x[1]+'</div>'+
+      '</div>';
+    }).join('')+
+    '</div></div>');
 }
 
 /* ── ADD MENUS ── */
