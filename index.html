@@ -2070,7 +2070,7 @@ function rPDet(){
     // QUICK CONTACT ACTIONS
     '<div class="det-actions">'+
       (p.p?'<a href="tel:'+p.p+'" class="det-act-btn gn">📞<span>Call</span></a>':'<div class="det-act-btn disabled">📞<span>No Phone</span></div>')+
-      '<button class="det-act-btn bl" onclick="smsM(\''+esc(p.p)+'\',\''+esc(p.n)+'\',\''+esc(p.a)+'\','+p.id+')">💬<span>SMS</span></button>'+
+      '<button class=\"det-act-btn bl\" data-luxe-smsbtn=\"pdet\" data-luxe-pid=\"'+p.id+'\">💬<span>SMS</span></button>'+
       '<button class="det-act-btn am" onclick="emailM(\''+esc(p.e||'')+'\',\''+esc(p.n)+'\',\''+esc(p.a)+'\','+p.id+')">✉️<span>Email</span></button>'+
       '<button class="det-act-btn pu" onclick="openNote('+p.id+')">📝<span>Note</span></button>'+
     '</div>'+
@@ -2515,7 +2515,7 @@ function cRow(c){
   '</div>';
 }
 
-function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+''+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class="det-act-btn bl" onclick="smsM(\''+esc(c.phone||'')+'\',\''+esc(c.name)+'\',\'\',null)">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
+function rCDet(){var c=gC().find(function(x){return x.id===S.cid;});if(!c){go('contacts');return;}$('scr').innerHTML='<div class="det-hero" style="text-align:center;padding-bottom:20px"><img class="av rnd" src="'+''+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" loading="lazy" alt="'+ini(c.name)+'" style="width:72px;height:72px;margin:0 auto 12px"><div class="av rnd '+avc(c.name)+'" style="display:none;width:72px;height:72px;margin:0 auto 12px;font-size:24px">'+ini(c.name)+'</div><div class="det-name">'+( c.name||'Unknown')+'</div><div class="det-addr">'+(c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'No phone')+'</div><div class="det-actions" style="justify-content:center;margin-top:12px">'+(c.phone?'<a href="tel:'+c.phone+'" class="det-act-btn gn">📞<span>Call</span></a>':'')+'<button class=\"det-act-btn bl\" data-luxe-smsbtn=\"cdet\" data-luxe-cid=\"'+c.id+'\">💬<span>SMS</span></button>'+(c.email?'<button class="det-act-btn am" onclick="emailM(\''+esc(c.email)+'\',\''+esc(c.name)+'\',\'\',null)">✉️<span>Email</span></button>':'')+'</div></div><div class="qr" style="padding:10px 14px"><div class="qb qb-ed" onclick="editCM(\''+c.id+'\')">✏️ Edit</div><div class="qb qb-dl" onclick="delC(\''+c.id+'\')">🗑️ Delete</div></div><div class="card-block" style="padding:14px 16px"><div class="info-ttl">Contact Info</div>'+[['Name',c.name||'—'],['Phone',c.phone?'<a href="tel:'+c.phone+'" style="color:var(--teal);text-decoration:none">'+c.phone+'</a>':'—'],['Email',c.email?'<a href="mailto:'+c.email+'" style="color:var(--teal);text-decoration:none">'+c.email+'</a>':'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(function(e){return'<div class="info-r"><div class="ir-l">'+e[0]+'</div><div class="ir-v">'+e[1]+'</div></div>';}).join('')+'</div><div style="height:80px"></div>';}
 function editCM(id){var c=gC().find(function(x){return x.id===id;})||{};modal('<div class="sht"><div class="sht-h"></div><div class="sht-hdr"><div><div class="sht-ttl">✏️ Edit Contact</div></div><button class="sht-x" onclick="cls()">✕</button></div><div class="sht-bd"><div class="fg"><div class="fl">Name</div><input class="fi" id="ecn" value="'+esc(c.name||'')+'"></div><div class="fg"><div class="fl">Phone</div><input class="fi" id="ecp" type="tel" value="'+(c.phone||'')+'"></div><div class="fg"><div class="fl">Email</div><input class="fi" id="ece" type="email" value="'+(c.email||'')+'"></div><div class="fg"><div class="fl">Address</div><input class="fi" id="eca" value="'+esc(c.address||'')+'"></div><div class="fg"><div class="fl">Notes</div><textarea class="fta" id="ecno" style="min-height:70px">'+(c.notes||'')+'</textarea></div></div><div class="sht-ft"><button class="btn btn-gh" onclick="cls()">Cancel</button><button class="btn btn-gd" onclick="saveCM(\''+id+'\')">Save</button></div></div>');}
 function saveCM(id){var cs=gC();var c=cs.find(function(x){return x.id===id;});if(!c){c={id:id};cs.push(c);}c.name=$('ecn').value;c.phone=fmtPh($('ecp').value);c.email=$('ece').value;c.address=$('eca').value;c.notes=$('ecno').value;sC();cls();toast('Saved ✓');if(S.pg==='cdet')rCDet();else rContacts();}
 function delC(id){_contacts=gC().filter(function(c){return c.id!==id;});sC();toast('Deleted');go('contacts',true);}
@@ -5088,6 +5088,34 @@ async function refreshListingAlerts(){
   }, true);
 })();
 
+
+
+/* v40: SMS button event delegation - robust against escaping issues */
+(function(){
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-luxe-smsbtn]');
+    if(!btn) return;
+    var kind = btn.dataset.luxeSmsbtn;
+    try {
+      if(kind === 'pdet'){
+        var pid = parseInt(btn.dataset.luxePid);
+        var p = gP().find(function(x){return x.id === pid;});
+        if(!p){toast('Property not found'); return;}
+        if(!p.p){toast('No phone number for this property'); return;}
+        smsM(p.p, p.n||'', p.a||'', p.id);
+      } else if(kind === 'cdet'){
+        var cid = btn.dataset.luxeCid;
+        var contact = gC().find(function(x){return String(x.id) === String(cid);});
+        if(!contact){toast('Contact not found'); return;}
+        if(!contact.phone){toast('No phone number for this contact'); return;}
+        smsM(contact.phone, contact.name||'', contact.address||'', null);
+      }
+    } catch(err){
+      console.log('SMS button error:', err);
+      toast('SMS error: ' + (err.message||'unknown'));
+    }
+  }, false);
+})();
 
 window.addEventListener('DOMContentLoaded',function(){
   applyTextSettings();
