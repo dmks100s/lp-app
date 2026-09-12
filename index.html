@@ -3193,6 +3193,7 @@ var TMPLS=[
     {l:'📅 Open Home Follow-up',m:'Hi [Name], Alex from Luxe Properties. Thank you for attending our open home today — it was wonderful to meet you! I\'d love to answer any questions and keep you updated on this property and similar ones. Please feel free to reach out anytime. — Alex 0434 342 390'},
     {l:'💰 Price Adjustment',m:'Hi [Name], Alex from Luxe Properties. Quick update — the vendor on a property that may interest you has adjusted the asking price. This could be a real opportunity. Would you like me to arrange a private viewing this week? — Alex 0434 342 390'},
     {l:'🏡 Off-Market Opportunity',m:'Hi [Name], Alex from Luxe Properties here. I have an exciting off-market property coming up that might be perfect for you — before it hits the public portals. Would you like to hear more details? Let\'s talk! — Alex 0434 342 390'},
+    {l:'🤝 Follow Up Vendor',m:'Hi [Name], Alex from Luxe Properties Melbourne. Just following up after our recent conversation — I wanted to check in and see if you had any questions or if there\'s anything I can help clarify. Whenever you\'re ready to take the next step, I\'m here to make it seamless. — Alex 0434 342 390'},
     {l:'✏️ Custom Message',m:''}
   ];
 
@@ -5090,74 +5091,84 @@ async function refreshListingAlerts(){
 
 
 
-/* v41: SMS button — robust delegation + direct fallback */
+/* v42: SMS button — shows template picker, each template one-tap sends */
+window._luxeSMSCtx = null; // Stores current SMS recipient context
 (function(){
-  function findRow(el, kind){
-    // For pdet: extract pid from data attr on button
-    // For cdet: extract cid from data attr on button
-    return el.dataset.luxePid || el.dataset.luxeCid;
-  }
-  
   function handleSMSClick(e){
     var btn = e.target.closest('[data-luxe-smsbtn]');
     if(!btn) return;
-    
-    // Prevent any default and stop propagation
     if(e.preventDefault) e.preventDefault();
     if(e.stopPropagation) e.stopPropagation();
-    
     var kind = btn.getAttribute('data-luxe-smsbtn');
-    
     try {
+      var phone, name, addr, pid;
       if(kind === 'pdet'){
         var pidStr = btn.getAttribute('data-luxe-pid');
-        var pid = parseInt(pidStr);
-        if(isNaN(pid)){toast('Bad property ID'); return false;}
-        var p = gP().find(function(x){return x.id === pid;});
-        if(!p){toast('Property #'+pid+' not found'); return false;}
+        var idNum = parseInt(pidStr);
+        if(isNaN(idNum)){toast('Bad property ID'); return false;}
+        var p = gP().find(function(x){return x.id === idNum;});
+        if(!p){toast('Property #'+idNum+' not found'); return false;}
         if(!p.p){toast('This property has no phone number'); return false;}
-        // Direct approach — open SMS immediately with a default template
-        var fn = (p.n||'').split(' ')[0] || 'there';
-        var body = 'Hi '+fn+', Alex Doguluer from Luxe Properties Melbourne. Hope you\'re well — happy to chat about your property whenever suits. Kind regards, Alex';
-        var url = (typeof smsUrl === 'function') ? smsUrl(p.p, body) : ('sms:'+p.p);
-        // Log it
-        if(typeof gI === 'function'){
-          gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a||'',name:p.n||'',phone:p.p,outcome:'sent',notes:body.substring(0,120),date:new Date().toISOString()});
-          if(typeof sI === 'function') sI();
-        }
-        window.location.href = url;
-        return false;
+        phone = p.p; name = p.n || ''; addr = p.a || ''; pid = p.id;
       } else if(kind === 'cdet'){
         var cidStr = btn.getAttribute('data-luxe-cid');
         var contact = gC().find(function(x){return String(x.id) === String(cidStr);});
         if(!contact){toast('Contact not found'); return false;}
         if(!contact.phone){toast('This contact has no phone number'); return false;}
-        var fn2 = (contact.name||'').split(' ')[0] || 'there';
-        var body2 = 'Hi '+fn2+', Alex Doguluer from Luxe Properties Melbourne. Hope you\'re well — happy to chat whenever suits. Kind regards, Alex';
-        var url2 = (typeof smsUrl === 'function') ? smsUrl(contact.phone, body2) : ('sms:'+contact.phone);
-        if(typeof gI === 'function'){
-          gI().push({id:Date.now(),type:'sms',propertyId:null,address:contact.address||'',name:contact.name||'',phone:contact.phone,outcome:'sent',notes:body2.substring(0,120),date:new Date().toISOString()});
-          if(typeof sI === 'function') sI();
-        }
-        window.location.href = url2;
-        return false;
-      }
+        phone = contact.phone; name = contact.name || ''; addr = contact.address || ''; pid = null;
+      } else return false;
+      window._luxeSMSCtx = {phone:phone, name:name, addr:addr, pid:pid};
+      showSMSTemplatePicker();
     } catch(err){
       console.log('SMS click error:', err);
       toast('SMS error: ' + (err.message||'unknown'));
     }
     return false;
   }
-  
-  // Attach BOTH click and touchend for maximum iOS compatibility
   document.addEventListener('click', handleSMSClick, true);
-  document.addEventListener('touchend', function(e){
-    var btn = e.target && e.target.closest && e.target.closest('[data-luxe-smsbtn]');
-    if(btn){
-      handleSMSClick({target: btn, preventDefault: function(){}, stopPropagation: function(){}});
-    }
-  }, true);
 })();
+
+/* Bottom-sheet template picker — tap a template = open Messages instantly */
+function showSMSTemplatePicker(){
+  var ctx = window._luxeSMSCtx;
+  if(!ctx) return;
+  var fn = (ctx.name||'').split(' ')[0] || 'there';
+  var displayName = ctx.name || 'Recipient';
+  var html = '<div class="sht" style="max-height:88vh"><div class="sht-h"></div>';
+  html += '<div class="sht-hdr"><div><div class="sht-ttl">💬 SMS Template</div><div class="sht-sub">To: '+displayName+' · '+ctx.phone+'</div></div><button class="sht-x" onclick="cls()">✕</button></div>';
+  html += '<div class="sht-bd" style="overflow-y:auto">';
+  html += '<div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding:0 2px">Tap to open in Messages</div>';
+  TMPLS.forEach(function(t, i){
+    var body = (t.m||'').replace(/\[Name\]/g, fn).replace(/\[Address\]/g, ctx.addr||'').replace(/\[Street\]/g, '').replace(/\[Suburb\]/g, '');
+    var preview = body ? body.substring(0, 90) + (body.length > 90 ? '…' : '') : '(Blank — write your own)';
+    html += '<div onclick="sendSMSTemplate('+i+')" style="padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent">';
+    html += '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">'+t.l+'</div>';
+    html += '<div style="font-size:12px;color:var(--muted);line-height:1.4">'+preview+'</div>';
+    html += '</div>';
+  });
+  html += '</div><div class="sht-ft"><button class="btn btn-gh btn-fw" onclick="cls()">Cancel</button></div></div>';
+  modal(html);
+}
+function sendSMSTemplate(i){
+  var ctx = window._luxeSMSCtx;
+  if(!ctx) return;
+  var t = TMPLS[i];
+  if(!t) return;
+  var fn = (ctx.name||'').split(' ')[0] || 'there';
+  var body = (t.m||'').replace(/\[Name\]/g, fn).replace(/\[Address\]/g, ctx.addr||'').replace(/\[Street\]/g, '').replace(/\[Suburb\]/g, '');
+  // If Custom (empty), fall back to greeting
+  if(!body) body = 'Hi '+fn+', ';
+  var url = smsUrl(ctx.phone, body);
+  // Log
+  if(typeof gI === 'function'){
+    gI().push({id:Date.now(), type:'sms', propertyId:ctx.pid, address:ctx.addr, name:ctx.name, phone:ctx.phone, outcome:'sent', notes:t.l+' — '+body.substring(0,120), date:new Date().toISOString()});
+    if(typeof sI === 'function') sI();
+  }
+  cls();
+  toast('Opening Messages…');
+  setTimeout(function(){window.location.href = url;}, 100);
+}
+
 
 window.addEventListener('DOMContentLoaded',function(){
   applyTextSettings();
