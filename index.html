@@ -5090,31 +5090,73 @@ async function refreshListingAlerts(){
 
 
 
-/* v40: SMS button event delegation - robust against escaping issues */
+/* v41: SMS button — robust delegation + direct fallback */
 (function(){
-  document.addEventListener('click', function(e){
+  function findRow(el, kind){
+    // For pdet: extract pid from data attr on button
+    // For cdet: extract cid from data attr on button
+    return el.dataset.luxePid || el.dataset.luxeCid;
+  }
+  
+  function handleSMSClick(e){
     var btn = e.target.closest('[data-luxe-smsbtn]');
     if(!btn) return;
-    var kind = btn.dataset.luxeSmsbtn;
+    
+    // Prevent any default and stop propagation
+    if(e.preventDefault) e.preventDefault();
+    if(e.stopPropagation) e.stopPropagation();
+    
+    var kind = btn.getAttribute('data-luxe-smsbtn');
+    
     try {
       if(kind === 'pdet'){
-        var pid = parseInt(btn.dataset.luxePid);
+        var pidStr = btn.getAttribute('data-luxe-pid');
+        var pid = parseInt(pidStr);
+        if(isNaN(pid)){toast('Bad property ID'); return false;}
         var p = gP().find(function(x){return x.id === pid;});
-        if(!p){toast('Property not found'); return;}
-        if(!p.p){toast('No phone number for this property'); return;}
-        smsM(p.p, p.n||'', p.a||'', p.id);
+        if(!p){toast('Property #'+pid+' not found'); return false;}
+        if(!p.p){toast('This property has no phone number'); return false;}
+        // Direct approach — open SMS immediately with a default template
+        var fn = (p.n||'').split(' ')[0] || 'there';
+        var body = 'Hi '+fn+', Alex Doguluer from Luxe Properties Melbourne. Hope you\'re well — happy to chat about your property whenever suits. Kind regards, Alex';
+        var url = (typeof smsUrl === 'function') ? smsUrl(p.p, body) : ('sms:'+p.p);
+        // Log it
+        if(typeof gI === 'function'){
+          gI().push({id:Date.now(),type:'sms',propertyId:p.id,address:p.a||'',name:p.n||'',phone:p.p,outcome:'sent',notes:body.substring(0,120),date:new Date().toISOString()});
+          if(typeof sI === 'function') sI();
+        }
+        window.location.href = url;
+        return false;
       } else if(kind === 'cdet'){
-        var cid = btn.dataset.luxeCid;
-        var contact = gC().find(function(x){return String(x.id) === String(cid);});
-        if(!contact){toast('Contact not found'); return;}
-        if(!contact.phone){toast('No phone number for this contact'); return;}
-        smsM(contact.phone, contact.name||'', contact.address||'', null);
+        var cidStr = btn.getAttribute('data-luxe-cid');
+        var contact = gC().find(function(x){return String(x.id) === String(cidStr);});
+        if(!contact){toast('Contact not found'); return false;}
+        if(!contact.phone){toast('This contact has no phone number'); return false;}
+        var fn2 = (contact.name||'').split(' ')[0] || 'there';
+        var body2 = 'Hi '+fn2+', Alex Doguluer from Luxe Properties Melbourne. Hope you\'re well — happy to chat whenever suits. Kind regards, Alex';
+        var url2 = (typeof smsUrl === 'function') ? smsUrl(contact.phone, body2) : ('sms:'+contact.phone);
+        if(typeof gI === 'function'){
+          gI().push({id:Date.now(),type:'sms',propertyId:null,address:contact.address||'',name:contact.name||'',phone:contact.phone,outcome:'sent',notes:body2.substring(0,120),date:new Date().toISOString()});
+          if(typeof sI === 'function') sI();
+        }
+        window.location.href = url2;
+        return false;
       }
     } catch(err){
-      console.log('SMS button error:', err);
+      console.log('SMS click error:', err);
       toast('SMS error: ' + (err.message||'unknown'));
     }
-  }, false);
+    return false;
+  }
+  
+  // Attach BOTH click and touchend for maximum iOS compatibility
+  document.addEventListener('click', handleSMSClick, true);
+  document.addEventListener('touchend', function(e){
+    var btn = e.target && e.target.closest && e.target.closest('[data-luxe-smsbtn]');
+    if(btn){
+      handleSMSClick({target: btn, preventDefault: function(){}, stopPropagation: function(){}});
+    }
+  }, true);
 })();
 
 window.addEventListener('DOMContentLoaded',function(){
